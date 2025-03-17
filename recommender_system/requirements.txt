@@ -1,1 +1,11 @@
 # requirements.txt
+pandas
+SQLAlchemy
+psycopg2-binary
+fastapi
+uvicorn
+scikit-learn
+nltk
+requests
+python-dotenv
+pyarrow
