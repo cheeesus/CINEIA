@@ -1,0 +1,42 @@
+/* src/styles/MoviesList.css */
+
+/* Style for the movie list container */
+.movie-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Grid layout for movie items */
+    gap: 20px; /* Space between movie items */
+    margin-top: 20px;
+    padding: 10px; /* Padding around the movie list */
+  }
+  
+  /* Style for each movie item */
+  .movie-item {
+    background-color: #343a40;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+    text-align: center;
+    overflow: hidden;
+  }
+  
+  .movie-item:hover {
+    transform: translateY(-5px); /* Hover effect */
+  }
+  
+  /* Style for the movie poster */
+  .movie-poster {
+    
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 10px;
+  }
+  
+  /* Style for the movie title */
+  .movie-item h2 {
+    font-size: 1.2rem;
+    color: #aaabad;
+    margin-bottom: 10px;
+  }
+  
