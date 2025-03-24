@@ -1,0 +1,58 @@
+"use client";
+import { useState, useContext } from "react";
+import { UserContext } from "@/context/UserContext";
+import { loginUser } from "../../helpers/auth";
+import { useRouter } from "next/navigation";
+
+import Header from "@/components/Header";
+
+import styles from "@/styles/login.module.css";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const { login } = useContext(UserContext);  // Context for managing the user state
+  const router = useRouter();
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await loginUser(email, password);  // Login user
+      const { token, email: userEmail } = response;  // Destructure token and email from the response
+      login({ email: userEmail, token });  // Set user context with email and token
+      router.push("/");  // Redirect to the home page after successful login
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div>
+      <Header />
+      <div className={styles.formContainer}>
+        <h2 className={styles.title}>Login</h2>
+        <form className={styles.form} onSubmit={handleLogin}>
+          <input
+            className={styles.input}
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            className={styles.input}
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && <p>{error}</p>}
+          <button className={styles.submitBtn} type="submit">
+            Login
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

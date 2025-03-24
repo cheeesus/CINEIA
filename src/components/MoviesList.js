@@ -1,0 +1,82 @@
+import React, { useEffect, useState } from "react";
+import Link from "next/link"; // Correct way to import Link from Next.js
+import axios from "axios"; // Use axios for API requests
+
+const MoviesList = () => {
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);  // Track the current page
+  const [hasMore, setHasMore] = useState(true);  // Flag to check if there are more movies
+
+  // Function to fetch movies with pagination
+  const fetchMovies = async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:5000/movies/", {
+        params: {
+          page: page,
+          limit: 24,  // Limit the number of movies per request
+        },
+      });
+      const newMovies = response.data;
+
+      if (newMovies.length < 24) {
+        setHasMore(false);  // If there are less than 24 movies, it's the last page
+      }
+
+      setMovies((prevMovies) => [...prevMovies, ...newMovies]);
+      setLoading(false);
+    } catch (err) {
+      setError("Failed to load movies");
+      setLoading(false);
+    }
+  };
+
+  // Fetch movies when the page number changes
+  useEffect(() => {
+    fetchMovies();
+  }, [page]);
+
+  // Load more movies when the button is clicked
+  const loadMore = () => {
+    if (hasMore) {
+      setPage(page + 1);  // Load the next page
+    }
+  };
+
+  // Display loading message or error message
+  if (loading) {
+    return <div>Loading movies...</div>;
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  return (
+    <>
+      <div className="movie-list">
+        {movies.map((movie) => (
+          <div key={movie.id} className="movie-item">
+            <Link href={`/movies/${movie.id}`}> 
+                <img 
+                  src={movie.poster_url || "https://via.placeholder.com/500x750?text=No+Image+Available"} 
+                  alt={movie.title} 
+                  className="movie-poster" 
+                />
+                <h2>{movie.title}</h2>
+            </Link>
+          </div>
+        ))}
+      </div>
+
+      {hasMore && (
+        <button onClick={loadMore} className="load-more-btn">
+          Load More
+        </button>
+      )}
+    </>
+  );
+};
+
+export default MoviesList;
