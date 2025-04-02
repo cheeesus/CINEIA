@@ -1,4 +1,3 @@
-# models/pytorch_model.py
 import torch
 import torch.nn as nn
 
@@ -7,28 +6,24 @@ class TwoTowerMLPModel(nn.Module):
         super(TwoTowerMLPModel, self).__init__()
         self.user_embedding = nn.Embedding(num_users + 1, embedding_dim)
         self.movie_embedding = nn.Embedding(num_movies + 1, embedding_dim)
-        
+
         self.fc1 = nn.Linear(embedding_dim * 2, hidden_dim)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(hidden_dim, 1)  
+        self.fc2 = nn.Linear(hidden_dim, 1)  # logit 
 
     def forward(self, user_ids, movie_ids):
-        user_vec = self.user_embedding(user_ids)     # (batch_size, embedding_dim)
-        movie_vec = self.movie_embedding(movie_ids)   # (batch_size, embedding_dim)
-        
-        x = torch.cat([user_vec, movie_vec], dim=1)   # 拼接后 shape = (batch_size, embedding_dim * 2)
+        #  embedding 
+        user_vec = self.user_embedding(user_ids)     # shape: (batch_size, embedding_dim)
+        movie_vec = self.movie_embedding(movie_ids)  # shape: (batch_size, embedding_dim)
+
+        # combination feature
+        x = torch.cat([user_vec, movie_vec], dim=1)  # shape: (batch_size, embedding_dim * 2)
+
+        # MLP层：全连接 -> ReLU -> Dropout -> 输出层
         x = self.fc1(x)
         x = self.relu(x)
         x = self.dropout(x)
-        logit = self.fc2(x).squeeze(1)  # shape = (batch_size,)
-        return logit
-    
-    def forward(self, user_ids, movie_ids):
-        user_vec = self.user_embedding(user_ids)
-        movie_vec = self.movie_embedding(movie_ids)
-        # add dropout to prevent overfitting and suppress large values
-        user_vec = self.dropout(user_vec)
-        movie_vec = self.dropout(movie_vec)
-        dot = (user_vec * movie_vec).sum(dim=1)
-        return dot  # no sigmoid here, as use BCEWithLogitsLoss
+        logit = self.fc2(x).squeeze(1)  # shape: (batch_size,)
+
+        return logit  # raw logits，不加 sigmoid

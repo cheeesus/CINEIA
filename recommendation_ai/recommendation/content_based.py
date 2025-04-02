@@ -2,6 +2,21 @@ import numpy as np
 from collections import Counter
 from .collaborative_filtering import cosine_similarity
 
+def gather_all_genres(movie_data_dict):
+    """从所有电影信息中提取所有可能的 genre_id 列表"""
+    genre_set = set()
+    for movie in movie_data_dict.values():
+        genre_set.update(movie.get("genres", []))
+    return list(genre_set)
+
+def gather_all_keywords(movie_data_dict):
+    """从所有电影信息中提取所有可能的 keyword_id 列表"""
+    keyword_set = set()
+    for movie in movie_data_dict.values():
+        keyword_set.update(movie.get("keywords", []))
+    return list(keyword_set)
+
+
 def build_movie_vector(movie_info, genre_idx_map, keyword_idx_map):
     """
     根据电影信息构建向量:
@@ -86,17 +101,8 @@ def recommend_by_content(
     movie_vectors,
     top_n=10
 ):
-    """
-    基于内容的推荐：
-    1) 构建用户偏好向量
-    2) 统计用户偏好的语言(若有的话，就过滤候选)
-    3) 对候选电影计算相似度并排序
-    4) 返回 top_n
-    """
-    # =========== 1) 构建用户向量 ===========
     user_vector = build_user_profile_vector(user_view_history, movie_vectors)
 
-    # =========== 2) 语言过滤 ===========
     from collections import Counter
     language_counter = Counter()
     for m_id in user_view_history:
@@ -105,22 +111,17 @@ def recommend_by_content(
             language_counter[movie_info["language"]] += 1
 
     if not language_counter:
-        # 如果没有语言偏好，说明用户还没看过电影或数据缺失
         preferred_languages = set()
     else:
-        # 取出现次数最多的前2种语言
         preferred_languages = set([lang for lang, _ in language_counter.most_common(2)])
 
-    # =========== 3) 计算候选相似度 + 语言过滤 ===========
     movie_scores = []
     for m_id in candidate_movie_ids:
         movie_info = movie_data_dict.get(m_id)
         if not movie_info:
             continue
-        # 若用户有语言偏好，则不在此范围内的电影直接跳过
         if preferred_languages and movie_info.get("language") not in preferred_languages:
             continue
-
         mv = movie_vectors.get(m_id)
         if mv is None:
             continue
@@ -128,19 +129,6 @@ def recommend_by_content(
         score = cosine_similarity(user_vector, mv)
         movie_scores.append((m_id, score))
 
-    movie_scores.sort(key=lambda x: x[1], reverse=True)
-    return [m_id for (m_id, _) in movie_scores[:top_n]]
+    # 改为返回 dict
+    return dict(movie_scores)  # dict[movie_id] = score
 
-def gather_all_genres(movie_data_dict):
-    """从所有电影信息中提取所有可能的 genre_id 列表"""
-    genre_set = set()
-    for movie in movie_data_dict.values():
-        genre_set.update(movie.get("genres", []))
-    return list(genre_set)
-
-def gather_all_keywords(movie_data_dict):
-    """从所有电影信息中提取所有可能的 keyword_id 列表"""
-    keyword_set = set()
-    for movie in movie_data_dict.values():
-        keyword_set.update(movie.get("keywords", []))
-    return list(keyword_set)

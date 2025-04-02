@@ -48,24 +48,13 @@ def recommend_by_user_cf(
     top_k=5, 
     top_n=10
 ):
-    """
-    基于用户-用户协同过滤进行推荐。
-      - target_user_id: 目标用户
-      - R: 用户-电影矩阵 (shape = [num_users, num_movies])
-      - user_ids, movie_ids: 对应的用户ID列表、电影ID列表
-      - user_idx_map, movie_idx_map: ID到矩阵索引的映射
-      - top_k: 找到与目标用户最相似的K个用户
-      - top_n: 最终返回的推荐电影数
-    
-    返回: 推荐电影ID列表
-    """
     if target_user_id not in user_idx_map:
-        return []  # 目标用户不在矩阵中，无法推荐
+        return {}
 
     target_idx = user_idx_map[target_user_id]
     target_vector = R[target_idx, :]
 
-    # 1) 计算目标用户与其他用户的相似度
+    # 1) 计算相似度
     similarities = []
     for other_user_id in user_ids:
         if other_user_id == target_user_id:
@@ -74,12 +63,12 @@ def recommend_by_user_cf(
         sim = cosine_similarity(target_vector, R[other_idx, :])
         similarities.append((other_user_id, sim))
 
-    # 2) 找到最相似的 top_k 个用户
+    # 2) 选出最相似的 top_k 用户
     similarities.sort(key=lambda x: x[1], reverse=True)
     top_k_users = similarities[:top_k]
 
-    # 3) 统计这些相似用户看过、但目标用户没看过的电影
-    seen_by_target = set(np.where(target_vector > 0)[0])  
+    # 3) 统计候选电影并加权相似度得分
+    seen_by_target = set(np.where(target_vector > 0)[0])
     candidate_scores = {}
 
     for (u_id, sim_val) in top_k_users:
@@ -90,12 +79,11 @@ def recommend_by_user_cf(
             if movie_col_idx not in seen_by_target:
                 candidate_scores[movie_col_idx] = candidate_scores.get(movie_col_idx, 0) + sim_val
 
-    # 4) 根据累积得分排序，取前 top_n 个
-    sorted_candidates = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)
-    top_movie_cols = [c[0] for c in sorted_candidates[:top_n]]
-
-    # 还原电影ID
+    # 4) 返回 movie_id -> score 字典
     inv_movie_map = {v: k for k, v in movie_idx_map.items()}
-    recommended_movie_ids = [inv_movie_map[col] for col in top_movie_cols]
+    movie_score_dict = {
+        inv_movie_map[col]: score for col, score in candidate_scores.items()
+    }
 
-    return recommended_movie_ids
+    return movie_score_dict  # 注意这里返回的是 dict，不是 list
+

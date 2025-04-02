@@ -63,7 +63,7 @@ def generate_training_data(neg_ratio=1):
 
     neg_records = []
     for user, pos_movies in user_pos_map.items():
-        # 候选负样本：那些电影的 genre 与用户观看的 genre 没有交集
+        # negative samples are those movies that the user has not watched and whose genres do not intersect with the user's watched genres
         user_watched_genres = user_genres.get(user, set())
         neg_candidates = []
         for m in all_movies - pos_movies:

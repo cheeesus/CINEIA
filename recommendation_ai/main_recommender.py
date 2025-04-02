@@ -74,3 +74,52 @@ def recommend_content_for_user(user_id, top_n=10):
         _cached_movie_vectors,
         top_n=top_n
     )
+
+def recommend_hybrid_for_user(user_id, alpha=0.5, top_k=5, top_n=10):
+    """
+    混合推荐：α * CF + (1-α) * Content
+    - alpha: CF权重，范围 0~1
+    """
+    # 保证内容向量预计算完成
+    precompute_for_content()
+
+    # Step 1: 获取两种方法的打分
+    user_ids = get_all_user_ids()
+    movie_ids = get_all_movie_ids()
+    user_view_dict = get_user_view_dict()
+    R, user_idx_map, movie_idx_map = build_user_item_matrix(user_ids, movie_ids, user_view_dict)
+
+    cf_scores = recommend_by_user_cf(user_id, R, user_ids, movie_ids, user_idx_map, movie_idx_map, top_k=top_k, top_n=1000)
+    view_history = get_user_view_history(user_id)
+    content_scores = recommend_by_content(
+        user_id,
+        view_history,
+        _cached_all_movies,
+        _cached_movie_data_dict,
+        _cached_movie_vectors,
+        top_n=1000
+    )
+
+    # Step 2: 归一化得分
+    def normalize(score_dict):
+        if not score_dict:
+            return {}
+        max_val = max(score_dict.values())
+        if max_val == 0:
+            return score_dict
+        return {k: v / max_val for k, v in score_dict.items()}
+
+    cf_scores = normalize(cf_scores)
+    content_scores = normalize(content_scores)
+
+    # Step 3: 融合得分
+    hybrid_scores = {}
+    all_movie_ids = set(cf_scores.keys()) | set(content_scores.keys())
+    for m_id in all_movie_ids:
+        cf_val = cf_scores.get(m_id, 0)
+        cont_val = content_scores.get(m_id, 0)
+        hybrid_scores[m_id] = alpha * cf_val + (1 - alpha) * cont_val
+
+    # Step 4: 排序并返回 top_n
+    sorted_movies = sorted(hybrid_scores.items(), key=lambda x: x[1], reverse=True)
+    return [m_id for m_id, _ in sorted_movies[:top_n]]
