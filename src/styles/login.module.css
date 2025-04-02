@@ -1,16 +1,23 @@
+.background {
+    background-image: url('/background.jpg');
+    background-repeat: no-repeat;
+    background-size: cover;
+    height: 100vh;
+}
 .formContainer {
     width: 70%;
-    background-color: rgba(255, 255, 255, 0.843);
-    color: black;
+    background-color: rgba(26, 23, 23, 0.942);
+    color: rgb(229, 229, 229);
+    padding: 5em;
     margin: auto;
-    height: fit-content;
+    height: 91.6vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-evenly;
+    
 }
 .title {
-    font-size: 3rem;
+    font-size: 4rem;
     font-weight: bold;
     font-family: var(--font-geist-sans);
 }
@@ -28,15 +35,20 @@
     background-color: rgba(255, 255, 255, 0.893);
     height: 2rem;
     padding: 2px;
-    color: rgba(101, 100, 100, 0.865);
+    color: rgba(34, 34, 34, 0.865);
 }
 
 .submitBtn {
-    width: 5rem;
     font-size: 20px;
     font-weight: bold;
     font-family: var(--font-geist-mono);
-    padding: 5px;
+    padding: 10px 20px;
     border: none;
     border-radius: 3px;
+}
+
+.submitBtn:hover {
+    background-color: rgb(208, 210, 211);
+    color: rgba(0, 0, 0, 0.879);
+    cursor: pointer;
 }

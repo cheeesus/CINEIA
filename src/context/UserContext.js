@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useState, useEffect } from "react";
+import Cookies from "js-cookie";
 import { getCurrentUser, isAuthenticated } from "@/helpers/auth";
 
 // Create Context
@@ -17,8 +18,10 @@ export const UserProvider = ({ children }) => {
 
     if (loggedIn) {
       const currentUser = getCurrentUser(); // Fetch user info from token
-      setUser(currentUser);  // Set user object in context
-    }
+      if (currentUser) {
+        setUser(currentUser);  // Set user object in context
+      } 
+    }  
   }, []);
 
   const login = (userData) => {
@@ -29,6 +32,7 @@ export const UserProvider = ({ children }) => {
   const logout = () => {
     setUser(null);  // Clear user data
     setIsLoggedIn(false);
+    Cookies.remove("token");
   };
 
   return (

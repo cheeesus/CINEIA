@@ -1,56 +1,75 @@
 // helpers/auth.js
 import axios from "axios";
 import Cookies from "js-cookie";
+import {jwtDecode} from "jwt-decode"; // Install via npm: npm install jwt-decode
 
-const API_URL = "http://127.0.0.1:5000"; // Change to your Flask API URL
+const API_URL = "http://127.0.0.1:5000";
 
 // Register user
 export const registerUser = async (email, password, age) => {
-    try {
-      const response = await axios.post(`${API_URL}/auth/register`, {
-        email,
-        password,
-        age,
-      });
-      return response.data; 
-    } catch (error) {
-      throw new Error(error.response?.data?.error || "Registration failed");
-    }
-  };
-
-// Login user and save token in cookie
-export const loginUser = async (email, password) => {
-    try {
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-      const { token, email: userEmail } = response.data;  // Destructure the response
-      // Store the JWT token in a cookie
-      Cookies.set("token", token, { expires: 10 });
-      return { token, email: userEmail };  // Return the token and email
-    } catch (error) {
-      throw new Error(error.response?.data?.error || "Login failed");
-    }
-  };
-
-// Logout user (remove token)
-export const logoutUser = async () => {
   try {
-    await axios.post(`${API_URL}/auth/logout`);
-    Cookies.remove("token");
+    const response = await axios.post(`${API_URL}/auth/register`, {
+      email,
+      password,
+      age,
+    });
+    return response.data;
   } catch (error) {
-    console.error("Logout failed", error);
+    throw new Error(error.response?.data?.error || "Registration failed");
   }
 };
 
-// Check if the user is logged in (token is available)
-export const isAuthenticated = () => {
-  const token = Cookies.get("token");
-  return token ? true : false;
+// Login user and save token in cookie
+export const loginUser = async (email, password) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+    const { token, email: userEmail } = response.data;
+
+    // Extract the first part of the email as username
+    const username = userEmail.split("@")[0];
+
+    // Store token in cookies (secure: true for HTTPS, httpOnly should be set in backend)
+    Cookies.set("token", token, { expires: 10, secure: true });
+
+    return { token, username };
+  } catch (error) {
+    throw new Error(error.response?.data?.error || "Login failed");
+  }
 };
 
-// Get current user info (by decoding JWT)
+// Check if the user is logged in (also checks token expiration)
+export const isAuthenticated = () => {
+  const token = Cookies.get("token");
+  if (!token) return false;
+
+  try {
+    const decoded = jwtDecode(token);
+    const isTokenExpired = decoded.exp * 1000 < Date.now(); // Convert to milliseconds
+
+    if (isTokenExpired) {
+      Cookies.remove("token");
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Get current user info safely
 export const getCurrentUser = () => {
   const token = Cookies.get("token");
   if (!token) return null;
-  const decodedToken = JSON.parse(atob(token.split('.')[1])); // Decode JWT to get user info
-  return decodedToken;
+  try {
+    const decoded = jwtDecode(token);
+    if (!decoded.email) return null; // Ensure email exists in JWT
+    return { 
+      username: decoded.email.split("@")[0], // Extract username from email
+      email: decoded.email, // Store full email if needed
+      userId: decoded.user_id // Store user ID
+    };
+  } catch (error) {
+    return null;
+  }
 };
