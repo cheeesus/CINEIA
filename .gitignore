@@ -4,3 +4,4 @@ env_rec310/
 recommendation_ai/.pytest_cache/ 
 recommendation_ai/__pycache__/ 
 recommendation_ai/env_rec310/ 
+dnn_recommender/saved_model/*.pt 
