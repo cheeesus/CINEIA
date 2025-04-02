@@ -2,15 +2,16 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link"; // Correct way to import Link from Next.js
 import axios from "axios"; // Use axios for API requests
 
-const MoviesList = () => {
-  const [movies, setMovies] = useState([]);
+
+const RecentMoviesList = () => {
+  const [recentMovies, setRecentMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);  // Track the current page
   const [hasMore, setHasMore] = useState(true);  // Flag to check if there are more movies
 
-  // Function to fetch movies with pagination
-  const fetchMovies = async () => {
+  // Function to fetch recent movies with pagination
+  const fetchRecentMovies = async () => {
     try {
       const response = await axios.get("http://127.0.0.1:5000/movies/", {
         params: {
@@ -18,13 +19,13 @@ const MoviesList = () => {
           limit: 24,  // Limit the number of movies per request
         },
       });
-      const newMovies = response.data;
+      const newRecentMovies = response.data;
 
-      if (newMovies.length < 24) {
+      if (newRecentMovies.length < 24) {
         setHasMore(false);  // If there are less than 24 movies, it's the last page
       }
 
-      setMovies((prevMovies) => [...prevMovies, ...newMovies]);
+      setRecentMovies((prevMovies) => [...prevMovies, ...newRecentMovies]);
       setLoading(false);
     } catch (err) {
       setError("Failed to load movies");
@@ -34,7 +35,7 @@ const MoviesList = () => {
 
   // Fetch movies when the page number changes
   useEffect(() => {
-    fetchMovies();
+    fetchRecentMovies();
   }, [page]);
 
   // Load more movies when the button is clicked
@@ -56,20 +57,22 @@ const MoviesList = () => {
   return (
     <>
       <div className="movie-list">
-        {movies.map((movie) => (
-          <div key={movie.id} className="movie-item">
-            <Link href={`/movies/${movie.id}`}> 
+        {recentMovies.map((movie) => (
+          movie.poster_url ? ( // Check if poster_url is valid
+            <div key={movie.id} className="movie-item">
+              <Link href={`/movies/${movie.id}`}>
                 <img 
                   src={movie.poster_url || "https://via.placeholder.com/500x750?text=No+Image+Available"} 
                   alt={movie.title} 
                   className="movie-poster" 
                 />
                 <h2>{movie.title}</h2>
-            </Link>
-          </div>
+              </Link>
+            </div>
+          ) : null // Skip rendering if poster_url is null or falsy
         ))}
       </div>
-
+  
       {hasMore && (
         <button onClick={loadMore} className="load-more-btn">
           Load More
@@ -77,6 +80,7 @@ const MoviesList = () => {
       )}
     </>
   );
+  
 };
 
-export default MoviesList;
+export default RecentMoviesList;

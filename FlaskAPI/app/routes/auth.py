@@ -1,4 +1,6 @@
 # API/app/routes/auth.py
+import base64
+import binascii
 from flask import Blueprint, request, jsonify, g
 from app.utils.helpers import hash_password, verify_password, generate_token
 from app.connectDB import db_connect
@@ -40,20 +42,20 @@ def login():
         return jsonify({"error": "Email and password are required"}), 400
 
     try:
-        # Query the database for the user with the given email
+        # Query for the user with the given email
         with g.db.cursor() as cursor:
-            cursor.execute("SELECT id, email, password_hash FROM users WHERE email = %s", (email,))
+            cursor.execute("SELECT id, email, encode(password_hash, 'escape') as password_hash FROM users WHERE email = %s", (email,))
             user = cursor.fetchone()
-
-        # Check if the user exists and the password is correct
-        if user and verify_password(password, user[2]):  # Assuming the password hash is in the 3rd column (index 2)
-            # Generate a token with user ID
-            token = generate_token({"user_id": user[0]})
-            return jsonify({"email": user[1], "token": token}), 200
+        
+        if user :
+            print(f"Stored Hash: {user[2]}") 
+            print(f"Entered Password: {password}")
+            if verify_password(password, user[2]) :
+                token = generate_token({"user_id": user[0], "email": user[1]})
+                return jsonify({"email": user[1], "token": token}), 200  
         
         # If authentication fails
         return jsonify({"error": "Invalid credentials"}), 401
     except Exception as e:
-        # Catch any exceptions and print them for debugging
         print(f"Error during login: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500

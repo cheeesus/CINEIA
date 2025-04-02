@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { registerUser } from "../../helpers/auth";
 import { useRouter } from "next/navigation"; // Use next/navigation for routing in App Directory
-
+import styles from "@/styles/login.module.css";
 import Header from "@/components/Header";
 
 export default function Register() {
@@ -25,31 +25,34 @@ export default function Register() {
   };
 
   return (
-    <div>
+    <div className={styles.background}>
       <Header/>
-      <div className="register-form-container">
-        <h2>Register</h2>
-        <form onSubmit={handleRegister}>
+      <div className={styles.formContainer}>
+        <h2 className={styles.title}>Register</h2>
+        <form className={styles.form} onSubmit={handleRegister}>
           <input
+            className={styles.input}
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <input
+            className={styles.input}
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
           <input
+            className={styles.input}
             type="number"
             placeholder="Age"
             value={age}
             onChange={(e) => setAge(e.target.value)}
           />
           {error && <p>{error}</p>} {/* Display any error */}
-          <button type="submit">Register</button>
+          <button className={styles.submitBtn} type="submit">Register</button>
         </form>
       </div>
     </div>
