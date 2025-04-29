@@ -13,12 +13,17 @@ class TwoTowerMLPModel(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, 1)  # logit 
 
     def forward(self, user_ids, movie_ids):
-        user_vec = self.user_embedding(user_ids)     # (batch_size, embedding_dim)
-        movie_vec = self.movie_embedding(movie_ids)  # (batch_size, embedding_dim)
+        #  embedding 
+        user_vec = self.user_embedding(user_ids)     # shape: (batch_size, embedding_dim)
+        movie_vec = self.movie_embedding(movie_ids)  # shape: (batch_size, embedding_dim)
 
-        x = torch.cat([user_vec, movie_vec], dim=1)  # (batch_size, embedding_dim*2)
+        # combination feature
+        x = torch.cat([user_vec, movie_vec], dim=1)  # shape: (batch_size, embedding_dim * 2)
+
+        # MLP层：全连接 -> ReLU -> Dropout -> 输出层
         x = self.fc1(x)
         x = self.relu(x)
         x = self.dropout(x)
-        logit = self.fc2(x).squeeze(1)              # (batch_size,)
-        return logit  # raw logits (BCEWithLogitsLoss)
+        logit = self.fc2(x).squeeze(1)  # shape: (batch_size,)
+
+        return logit  # raw logits，不加 sigmoid

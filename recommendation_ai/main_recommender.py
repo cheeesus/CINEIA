@@ -97,7 +97,7 @@ def recommend_hybrid_for_user(user_id, alpha=0.5, top_k=5, top_n=10):
         _cached_all_movies,
         _cached_movie_data_dict,
         _cached_movie_vectors,
-        top_n=1000
+        top_n=100
     )
 
     # Step 2: 归一化得分

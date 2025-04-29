@@ -11,8 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
-from models.db import fetchall_dict, fetchone_dict
-from models.pytorch_model import TwoTowerMLPModel
+from db import fetchall_dict, fetchone_dict
+from pytorch_model import TwoTowerMLPModel
 
 os.makedirs("saved_model", exist_ok=True)
 

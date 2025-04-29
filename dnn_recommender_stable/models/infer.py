@@ -3,8 +3,8 @@ import os
 import time
 import numpy as np
 import torch
-from models.pytorch_model import TwoTowerMLPModel
-from models.db import *
+from pytorch_model import TwoTowerMLPModel
+from db import *
 from collections import Counter
 
 
