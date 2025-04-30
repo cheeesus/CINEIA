@@ -6,12 +6,13 @@ import {jwtDecode} from "jwt-decode"; // Install via npm: npm install jwt-decode
 const API_URL = "http://127.0.0.1:5000";
 
 // Register user
-export const registerUser = async (email, password, age) => {
+export const registerUser = async (email, password, age, selectedGenres) => {
   try {
     const response = await axios.post(`${API_URL}/auth/register`, {
       email,
       password,
       age,
+      selectedGenres,
     });
     return response.data;
   } catch (error) {
