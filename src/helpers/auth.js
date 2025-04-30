@@ -29,7 +29,7 @@ export const loginUser = async (email, password) => {
     const username = userEmail.split("@")[0];
 
     // Store token in cookies (secure: true for HTTPS, httpOnly should be set in backend)
-    Cookies.set("token", token, { expires: 10, secure: true });
+    Cookies.set("token", token, { expires: 0.5, secure: true , sameSite: "Strict" });
 
     return { token, username };
   } catch (error) {

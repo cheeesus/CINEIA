@@ -1,7 +1,7 @@
 # API/app/routes/auth.py
 import base64
 import binascii
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, make_response
 from app.utils.helpers import hash_password, verify_password, generate_token
 from app.connectDB import db_connect
 
@@ -15,7 +15,7 @@ def register():
     age = data.get('age')
 
     # Hash password for security
-    hashed_password = hash_password(password)
+    hashed_password = hash_password(password) 
 
     # Simple validation (you can improve this with more checks)
     if not email or not password or not age:
@@ -52,7 +52,9 @@ def login():
             print(f"Entered Password: {password}")
             if verify_password(password, user[2]) :
                 token = generate_token({"user_id": user[0], "email": user[1]})
-                return jsonify({"email": user[1], "token": token}), 200  
+                response = make_response(jsonify({"email": user[1], "token": token}))
+                response.set_cookie("token", token, httponly=True, secure=True)
+                return response, 200  
         
         # If authentication fails
         return jsonify({"error": "Invalid credentials"}), 401

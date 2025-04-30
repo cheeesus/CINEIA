@@ -7,7 +7,7 @@ def create_app():
     app = Flask(__name__)
     app.config.from_pyfile('config.py')
     # Enable CORS for all routes
-    CORS(app)
+    CORS(app, supports_credentials=True)
     #init db connection
     db_connect(app)
 
