@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 scripts/interactive_demo.py
-CLI 交互式推荐演示
+CLI 交互式推荐演示 interactive demo
 
 流程：
   1. 输入一个用户 ID（若不存在自动插入）
@@ -42,7 +42,7 @@ def ensure_user(user_id: int):
             "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
             (user_id, f"cli_{user_id}@demo.com", b"hash_placeholder"),
         )
-        print(f"✅ 已创建新用户 {user_id}")
+        print(f"✅ new user created {user_id}")
 
 
 def insert_views(user_id: int, movie_ids: List[int]):
@@ -57,12 +57,12 @@ def insert_views(user_id: int, movie_ids: List[int]):
 #                             交互函数                               #
 # ------------------------------------------------------------------ #
 def choose_movies(candidates: List[int], titles: dict[int, str]) -> List[int] | None:
-    print("\n请输入想看的电影序号（空格分隔），或 q 退出：")
+    print("\nPlease enter the serial number of the movie you want to watch (separated by Spaces), or exit with q:")
     for i, m in enumerate(candidates, 1):
-        print(f"[{i:02}] {titles.get(m, 'Unknown')}")
+        print(f"[{i:02}] ID={m} | {titles.get(m, 'Unknown')} ")
 
     while True:
-        raw = input("你的选择: ").strip().lower()
+        raw = input("your choices: ").strip().lower()
         if raw in {"q", "quit"}:
             return None
         try:
@@ -70,17 +70,17 @@ def choose_movies(candidates: List[int], titles: dict[int, str]) -> List[int] | 
             chosen = [candidates[i - 1] for i in idxs if 1 <= i <= len(candidates)]
             return chosen
         except ValueError:
-            print("❌ 输入格式错误，请重新输入")
+            print("The input format is incorrect. Please re-enter")
 
 
 # ------------------------------------------------------------------ #
 #                         增量训练封装                                #
 # ------------------------------------------------------------------ #
 def incremental_retrain():
-    print("\n📈 增量训练开始（召回 1 epoch + 精排 1 epoch）...")
+    print("\n📈 Incremental training begins (recall 1 epoch + rerank 1 epoch)...")
     recall_inc_train(neg_ratio=1, epochs=1)
     ranking_train_main(epochs=1, batch_size=4096, neg_ratio=1)
-    print("📈 增量训练完成\n")
+    print("📈 incremental training fini\n")
 
 
 # ------------------------------------------------------------------ #
@@ -92,11 +92,11 @@ def interactive_loop(user_id: int):
 
     while True:
         viewed = get_user_view_count(user_id)
-        print(f"\n=== 用户 {user_id} 已观看 {viewed} 部电影 ===")
+        print(f"\n=== user {user_id} has watched {viewed} films ===")
 
         rec_ids = recommend_movies_for_user(user_id, n_final=TOP_N)
         if not rec_ids:
-            print("⚠️  未能获得推荐，请检查数据。")
+            print("⚠️  unable to fetch datas, please check the database connection")
             break
 
         title_map = get_movie_titles(rec_ids)
@@ -119,9 +119,9 @@ def interactive_loop(user_id: int):
 # ------------------------------------------------------------------ #
 if __name__ == "__main__":
     try:
-        uid = int(input("请输入用户 ID（新的随便填一个整数）： ").strip())
+        uid = int(input("Please enter the user ID (fill in any integer for a new one) : ").strip())
     except ValueError:
-        print("❌ 用户 ID 必须是整数")
+        print(" x The user ID must be an integer")
         exit(1)
 
     interactive_loop(uid)
