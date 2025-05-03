@@ -7,7 +7,7 @@ recommendation_ai/env_rec310/
 dnn_recommender/saved_model/*.pt 
 recommendation_ai/env_rec310/
 dnn_recoomender_stable/saved_model/ 
-DNN_DeepCTR_Tower/saved_model/
+DNN_TorchFM_TTower/saved_model/
 dnn_recommender_stable/saved_model/ 
 output/ 
 *.pt 

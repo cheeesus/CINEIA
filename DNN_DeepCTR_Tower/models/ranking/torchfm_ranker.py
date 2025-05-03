@@ -1,4 +1,4 @@
-# DNN_DeepCTR_Tower\models\ranking\torchfm_ranker.py
+# DNN_TorchFM_TTower\models\ranking\torchfm_ranker.py
 """
 torch-fm 版 DeepFM 精排模型封装
 可被 train_ranking / infer_ranking 调用

@@ -1,4 +1,4 @@
-# DNN_DeepCTR_Tower\models\ranking\torchfm\deepfm.py
+# DNN_TorchFM_TTower\models\ranking\torchfm\deepfm.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
