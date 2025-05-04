@@ -25,7 +25,7 @@ python -m scripts.interactive_demo
 ```
 
 ### Project layout (high level)
-
+```bash
 models/
 │
 ├─ config.py             ← DB credentials
@@ -50,10 +50,10 @@ scripts/
     └─ interactive_demo.py
 saved_model/             ← trained weights (auto-created)
 requirements.txt
-
+```
 
 ### AI pipeline
-
+```bash
 new user
    │ cold_start(pop-REC+diversity)
    ▼
@@ -67,6 +67,7 @@ old user                 ▼
                          │
                          ▼
                     Top-N  personalised list
+```
 
 ### Database quick reference
 -- inspect public schema
