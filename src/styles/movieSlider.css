@@ -1,0 +1,82 @@
+h1 {
+    position: relative; 
+    display: inline-block; 
+    padding: 10px 0; 
+}
+
+h1::after {
+    content: ""; 
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 50%; 
+    height: 4px; 
+    background-color: rgb(198, 198, 198); 
+}
+.movie-slider-container {
+    position: relative;
+    width: 100%;
+    height: fit-content;
+    overflow: hidden; 
+  }
+  
+  .movie-slider {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    overflow-x: scroll;
+    -ms-overflow-style: none;  
+    scrollbar-width: none;
+    padding: 10px 0;
+  }
+  
+  .movie-item {
+    min-width: 200px; /* Adjust this depending on the size of your movie posters */
+  }
+  
+  .movie-poster {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+  
+  .scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    padding: 10px;
+    font-size: 24px;
+    border: none;
+    cursor: pointer;
+    z-index: 1;
+  }
+  
+  .scroll-btn.left {
+    left: 10px;
+  }
+  
+  .scroll-btn.right {
+    right: 10px;
+  }
+  
+  .load-more-btn {
+    padding: 10px 10px;
+    font-size: 16px;
+    background-color: transparent;
+    color: rgba(255, 255, 255, 0.866);
+    position: relative;
+    bottom: 35%;
+    right: 10px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+  
+  .load-more-btn:hover {
+    text-decoration: underline;
+    font-weight: bold;
+  }
+  
