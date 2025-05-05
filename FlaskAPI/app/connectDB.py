@@ -1,4 +1,3 @@
-# app/extensions.py
 import psycopg2
 from flask import g
 

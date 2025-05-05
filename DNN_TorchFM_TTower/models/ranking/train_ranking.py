@@ -12,9 +12,9 @@ from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from models.db import fetchone_dict
-from models.ranking.feature_engineer import build_training_df
-from models.ranking.custom_deepfm import DeepFM
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_training_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
 
 os.makedirs("saved_model", exist_ok=True)
 MODEL_PATH = "saved_model/deepfm_ranker.pt"

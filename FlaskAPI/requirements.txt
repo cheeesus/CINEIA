@@ -3,3 +3,4 @@ psycopg2
 python-dotenv
 pyjwt
 flask_cors
+bcrypt

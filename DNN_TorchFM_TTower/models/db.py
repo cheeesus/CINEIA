@@ -1,8 +1,8 @@
-# models/db.py
+# DNN_TorchFM_TTower\models\db.py
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from collections import Counter
-from models.config import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+from DNN_TorchFM_TTower.models.config import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
 
 def get_connection():
     return psycopg2.connect(

@@ -6,9 +6,9 @@
 import numpy as np
 import torch
 
-from models.db import fetchone_dict
-from models.ranking.feature_engineer import build_infer_df
-from models.ranking.custom_deepfm import DeepFM
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_infer_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
 
 MODEL_PATH = "saved_model/deepfm_ranker.pt"
 

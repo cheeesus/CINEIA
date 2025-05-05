@@ -15,11 +15,11 @@ from models.db import (
     fetchone_dict, execute_sql,
     get_movie_titles, get_user_view_count
 )
-from models.cold_start import recommend_cold_start
-from models.recall.two_tower import load_model as load_recall_model
-from models.recall.two_tower import recommend_warm_start
-from models.ranking.infer_ranking import rank_candidates
-from models.train_incremental import incremental_train
+from DNN_TorchFM_TTower.models.recall.cold_start import recommend_cold_start
+from DNN_TorchFM_TTower.models.recall.two_tower import load_model as load_recall_model
+from DNN_TorchFM_TTower.models.recall.two_tower import recommend_warm_start
+from DNN_TorchFM_TTower.models.ranking.infer_ranking import rank_candidates
+from DNN_TorchFM_TTower.models.recall.train_incremental import incremental_train
 
 RECALL_MODEL = load_recall_model()
 USER_ID = int(input("请输入用户 ID（新用户填一个从未用过的数字）：").strip())

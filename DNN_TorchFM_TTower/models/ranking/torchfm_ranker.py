@@ -9,7 +9,7 @@ from typing import Sequence
 
 import torch
 # from torchfm.deepfm import DeepFM
-from models.ranking.torchfm.deepfm import DeepFM
+from DNN_TorchFM_TTower.models.ranking.torchfm.deepfm import DeepFM
 
 MODEL_PATH = Path("saved_model/deepfm_ranker.pt")
 

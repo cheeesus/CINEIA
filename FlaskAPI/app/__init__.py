@@ -1,3 +1,4 @@
+# FlaskAPI\app\__init__.py
 from flask import Flask
 from flask_cors import CORS
 from app.connectDB import db_connect
@@ -7,7 +8,8 @@ def create_app():
     app = Flask(__name__)
     app.config.from_pyfile('config.py')
     # Enable CORS for all routes
-    CORS(app, supports_credentials=True)
+    # CORS(app, supports_credentials=True)
+    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
     #init db connection
     db_connect(app)
 

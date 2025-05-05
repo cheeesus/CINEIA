@@ -13,13 +13,13 @@ from typing import List, Tuple
 import numpy as np
 import torch
 
-from models.db import (
+from DNN_TorchFM_TTower.models.db import (
     get_max_user_id,
     get_max_movie_id,
     get_all_movie_ids_with_language,
     get_user_view_languages,
 )
-from models.pytorch_model import TwoTowerMLPModel
+from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 
 
 # --------------------------------------------------------------------------- #
@@ -28,15 +28,23 @@ from models.pytorch_model import TwoTowerMLPModel
 _MODEL_CACHE = {}  # {"path": model}
 
 
-def load_model(model_path: str = "saved_model/dnn_recommender.pt",
-               embedding_dim: int = 32) -> TwoTowerMLPModel:
+from pathlib import Path
+
+def load_model(model_path: str = None, embedding_dim: int = 32) -> TwoTowerMLPModel:
     """
     读取并缓存 Two-Tower 模型；多次调用不会重复 load。
     """
-    if model_path in _MODEL_CACHE:
-        return _MODEL_CACHE[model_path]
+    # 如果没有指定路径，默认用绝对路径
+    if model_path is None:
+        CURRENT_DIR = Path(__file__).resolve().parent  # DNN_TorchFM_TTower/models/recall
+        model_path = CURRENT_DIR.parent.parent / 'saved_model' / 'dnn_recommender.pt'
 
-    if not os.path.exists(model_path):
+    model_path = Path(model_path)
+
+    if str(model_path) in _MODEL_CACHE:
+        return _MODEL_CACHE[str(model_path)]
+
+    if not model_path.exists():
         raise FileNotFoundError(
             f"[two_tower] 模型文件 {model_path} 不存在，请先训练再推断。"
         )
@@ -49,8 +57,9 @@ def load_model(model_path: str = "saved_model/dnn_recommender.pt",
     model.load_state_dict(state)
     model.eval()
 
-    _MODEL_CACHE[model_path] = model
+    _MODEL_CACHE[str(model_path)] = model
     return model
+
 
 
 # --------------------------------------------------------------------------- #

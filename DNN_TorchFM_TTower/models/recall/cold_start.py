@@ -1,6 +1,6 @@
 # models/recall/cold_start.py
 import random
-from models.db import fetchall_dict
+from DNN_TorchFM_TTower.models.db import fetchall_dict
 
 def recommend_cold_start(top_n=10):
     """

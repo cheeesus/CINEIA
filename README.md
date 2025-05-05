@@ -1,57 +1,49 @@
-# CINEIA
+# CINEIA – AI
 
-Repository for Projet de Synthèse pour M1 IISC-SIC.
-
-## Current Status
-
-We have multiple modules in the project directory, mainly:
-
-- `DNN_light_TTower`
-- `DNN_TorchFM_TTower`
-
-✅ **The current focus is on the `DNN_TorchFM_TTower` module**, which implements a Two-Tower model architecture using the `torchfm` library. This is **more advanced and production-oriented** compared to the `DNN_light_TTower`.
-
-For deeper technical details, you can refer to the individual README located in the `DNN_TorchFM_TTower` directory, which provides a **quick start** guide, training steps, and inference instructions.
-
-<!-- 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
--->
-## Getting Started
-To run the Flask application, run the command: (make sure to be inside the FlaskAPI directory)
-
+1 · Prepare .env
+Create FlaskAPI/.env with your database credentials:
 ```bash
-python app.py
-```
-To run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+DB_HOST=postgresql-yannr.alwaysdata.net
+DB_NAME=yannr_00
+DB_USER=yannr_01
+DB_PASSWORD=Projet1234
+SECRET_KEY=dev-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-<!--
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+(The key can be any value - it is only used by Flask.)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2 · Install Python dependencies
+Activate your virtual-env, then install the two requirement files:
+```bash
+pip install -r DNN_TorchFM_TTower/requirements.txt
+pip install -r FlaskAPI/requirements.txt
+```
+3 · Train (or re-train) the AI models
+Run from the project root CINEIA/.
+Note the fully-qualified module paths (DNN_TorchFM_TTower. prefix).
 
-## Learn More
+3-A Train / retrain the Two-Tower recall model
+```bash
+python -m DNN_TorchFM_TTower.models.recall.train_two_tower --epochs 3 --batch 128
+```
+3-B Train / retrain the DeepFM re-rank model
+```bash
+python -m DNN_TorchFM_TTower.models.ranking.train_ranking --epochs 3
+```
+(You may shorten epochs while testing; saved weights go to DNN_TorchFM_TTower/saved_model/.)
 
-To learn more about Next.js, take a look at the following resources:
+4 · Run the Flask API
+```bash
+python FlaskAPI/app.py # default http://127.0.0.1:5000
+```
+Visiting / shows 404 – that is expected; the API lives under /api.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
--->
+5 · Call the Recommendation endpoint
+Pattern:
+```bash
+GET /api/recommend/<user_id>?top=<N>
+```
+Example:
+```bash
+http://localhost:5000/api/recommend/51
+```

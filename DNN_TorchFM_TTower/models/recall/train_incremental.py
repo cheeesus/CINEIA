@@ -13,9 +13,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from models.db import fetchone_dict
-from models.pytorch_model import TwoTowerMLPModel
-from models.recall.train_two_tower import (
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
+from DNN_TorchFM_TTower.models.recall.train_two_tower import (
     generate_training_data,
     RecommendationDataset,
 )

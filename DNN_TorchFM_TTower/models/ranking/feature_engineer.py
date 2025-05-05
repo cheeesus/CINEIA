@@ -10,7 +10,7 @@ from typing import List, Tuple
 
 import pandas as pd
 
-from models.db import fetchall_dict, fetchone_dict
+from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 
 
 # ------------------------------------------------------------------- #
