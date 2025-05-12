@@ -3,11 +3,11 @@
 1 · Prepare .env
 Create FlaskAPI/.env with your database credentials:
 ```bash
-DB_HOST=postgresql-yannr.alwaysdata.net
-DB_NAME=yannr_00
-DB_USER=yannr_01
-DB_PASSWORD=Projet1234
-SECRET_KEY=dev-key
+DB_HOST=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+SECRET_KEY=
 ```
 
 (The key can be any value - it is only used by Flask.)
