@@ -12,6 +12,14 @@ SECRET_KEY=dev-key
 
 (The key can be any value - it is only used by Flask.)
 
+1.1 create individual virtual environment
+```bash
+# I recommend to use python 3.10.11 as basic env
+cd CINEIA
+py -3.10 -m venv env_rec
+env_rec/Scripts/activate 
+```
+
 2 · Install Python dependencies
 Activate your virtual-env, then install the two requirement files:
 ```bash
