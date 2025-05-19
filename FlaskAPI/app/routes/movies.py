@@ -1,5 +1,7 @@
 # FlaskAPI\app\routes\movies.py
 from flask import Blueprint, g, jsonify, request
+from functools import wraps
+from app.utils.helpers import token_required
 
 movies_bp = Blueprint('movies', __name__)
 
@@ -11,7 +13,12 @@ def get_movies_recent():
     offset = (page - 1) * limit  # Calculate the offset for SQL query
 
     with g.db.cursor() as cursor:
-        cursor.execute("SELECT id, title, vote_average, release_date, poster_path FROM movies ORDER BY release_date DESC LIMIT %s OFFSET %s", (limit, offset))
+        cursor.execute("""
+            SELECT id, title, vote_average, release_date, poster_path, 
+                   vote_count, budget, popularity, runtime, director 
+            FROM movies 
+            ORDER BY release_date DESC LIMIT %s OFFSET %s
+        """, (limit, offset))
         movies = cursor.fetchall()
         movies_list = [
         {
@@ -19,7 +26,12 @@ def get_movies_recent():
             'title': movie[1],
             'vote_average': movie[2],
             'release_date': movie[3],
-            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[4]}" if movie[4] else None
+            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[4]}" if movie[4] else None,
+            'vote_count': movie[5],
+            'budget': movie[6],
+            'popularity': movie[7],
+            'runtime': movie[8],
+            'director': movie[9]
         }
         for movie in movies
     ]
@@ -33,7 +45,12 @@ def get_movies_top():
     offset = (page - 1) * limit  # Calculate the offset for SQL query
 
     with g.db.cursor() as cursor:
-        cursor.execute("SELECT id, title, vote_average, release_date, poster_path FROM movies ORDER BY vote_average DESC LIMIT %s OFFSET %s", (limit, offset))
+        cursor.execute("""
+            SELECT id, title, vote_average, release_date, poster_path,
+                   vote_count, budget, popularity, runtime, director 
+            FROM movies
+            ORDER BY vote_average DESC LIMIT %s OFFSET %s
+        """, (limit, offset))
         movies = cursor.fetchall()
         movies_list = [
         {
@@ -41,7 +58,12 @@ def get_movies_top():
             'title': movie[1],
             'vote_average': movie[2],
             'release_date': movie[3],
-            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[4]}" if movie[4] else None
+            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[4]}" if movie[4] else None,
+            'vote_count': movie[5],
+            'budget': movie[6],
+            'popularity': movie[7],
+            'runtime': movie[8],
+            'director': movie[9]
         }
         for movie in movies
     ]
@@ -91,7 +113,7 @@ def search_movies():
     offset = (page - 1) * limit  # Calculate offset for pagination
 
     with g.db.cursor() as cursor:
-        # Use ILIKE for case-insensitive search in PostgreSQL (use LIKE for MySQL)
+        # Use ILIKE for case-insensitive search in PostgreSQL
         cursor.execute(
             """
             SELECT id, title, vote_average, release_date, poster_path 
@@ -116,3 +138,112 @@ def search_movies():
         ]
 
     return jsonify({"movies": movies_list}), 200
+
+
+@movies_bp.route('/<int:movie_id>/add-to-list', methods=['POST'])
+@token_required
+def add_movie_to_list():
+    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
+    user_id = g.user_id  # Use user_id from the token
+
+    data = request.get_json()
+    list_name = data.get('list_name')
+
+    if not list_name:
+        return jsonify({'error': 'List name is required'}), 400
+
+    with g.db.cursor() as cursor:
+        # Check if the list exists or create a new one
+        cursor.execute("""
+            INSERT INTO lists (user_id, name)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id, name) DO NOTHING
+            RETURNING id
+        """, (user_id, list_name))
+        list_id_row = cursor.fetchone()
+
+        if not list_id_row:
+            cursor.execute("""
+                SELECT id FROM lists WHERE user_id = %s AND name = %s
+            """, (user_id, list_name))
+            list_id_row = cursor.fetchone()
+
+        list_id = list_id_row[0]
+
+        # Add the movie to the list
+        cursor.execute("""
+            INSERT INTO list_movies (list_id, movie_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (list_id, movie_id))
+        g.db.commit()
+
+    return jsonify({'message': f'Movie added to list "{list_name}" successfully'}), 200
+
+@movies_bp.route('/<int:movie_id>/rate', methods=['POST'])
+@token_required
+def rate_movie():
+    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
+    user_id = g.user_id  # Use user_id from the token
+
+    data = request.get_json()
+    rating = data.get('rating')
+
+    if not (0 <= rating <= 10):
+        return jsonify({'error': 'Rating must be between 0 and 10'}), 400
+
+    with g.db.cursor() as cursor:
+        # Insert or update the rating for the movie by the user
+        cursor.execute("""
+            INSERT INTO ratings (user_id, movie_id, rating)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (user_id, movie_id)
+            DO UPDATE SET rating = EXCLUDED.rating
+        """, (user_id, movie_id, rating))
+        g.db.commit()
+
+    return jsonify({'message': 'Movie rated successfully'}), 200
+
+@movies_bp.route('/<int:movie_id>/favorite', methods=['POST'], endpoint="add_favorite")
+@token_required
+def add_movie_to_favorites():
+    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
+    user_id = g.user_id  # Use user_id from the token
+
+    with g.db.cursor() as cursor:
+        # Ensure the "favorites" list exists for the user
+        cursor.execute("""
+            INSERT INTO lists (user_id, name)
+            VALUES (%s, 'favorites')
+            ON CONFLICT (user_id, name) DO NOTHING
+            RETURNING id
+        """, (user_id,))
+        favorites_list_id = cursor.fetchone()[0]
+
+        # Add the movie to the "favorites" list
+        cursor.execute("""
+            INSERT INTO list_movies (list_id, movie_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (favorites_list_id, movie_id))
+        g.db.commit()
+
+    return jsonify({"message": "Movie added to favorites successfully"}), 200
+
+@movies_bp.route('/<int:movie_id>/favorite', methods=['DELETE'], endpoint="remove_favorite")
+@token_required
+def remove_movie_from_favorites():
+    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
+    user_id = g.user_id  # Use user_id from the token
+
+    with g.db.cursor() as cursor:
+        # Remove the movie from the "favorites" list
+        cursor.execute("""
+            DELETE FROM list_movies
+            WHERE movie_id = %s AND list_id = (
+                SELECT id FROM lists WHERE user_id = %s AND name = 'favorites'
+            )
+        """, (movie_id, user_id))
+        g.db.commit()
+
+    return jsonify({"message": "Movie removed from favorites successfully"}), 200
