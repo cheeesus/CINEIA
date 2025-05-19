@@ -66,7 +66,7 @@ const RecentMoviesList = () => {
                   alt={movie.title} 
                   className="movie-poster" 
                 />
-                <h2>{movie.title}</h2>
+                <h3>{movie.title}</h3>
               </Link>
             </div>
           ) : null // Skip rendering if poster_url is null or falsy
