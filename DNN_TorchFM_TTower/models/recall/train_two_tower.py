@@ -6,6 +6,7 @@ Two-Tower 召回模型离线训练脚本
 import os
 import random
 import time
+from pathlib import Path
 from typing import List, Dict, Set
 
 import numpy as np
@@ -21,7 +22,16 @@ from torch.utils.data import Dataset, DataLoader
 from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 
-os.makedirs("saved_model", exist_ok=True)
+# ---------------------------------------------------------------------------
+#                     固定 saved_model 目录到包根下                           #
+# ---------------------------------------------------------------------------
+ROOT_DIR   = Path(__file__).resolve().parents[2]           # …/CINEIA/DNN_TorchFM_TTower
+SAVE_DIR   = ROOT_DIR / "saved_model"
+SAVE_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_PATH = SAVE_DIR / "dnn_recommender.pt"
+
+
+# os.makedirs("saved_model", exist_ok=True)
 
 # --------------------------------------------------------------------------- #
 #                            数据提取 / 特征构造                               #
@@ -158,10 +168,10 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
 
         if avg_v < best_val:
             best_val = avg_v
-            torch.save(model.state_dict(), "saved_model/dnn_recommender.pt")
-            print("   ↳ ✅ 模型已保存")
+            torch.save(model.state_dict(), MODEL_PATH)
+            print("   ↳  Model saved")
 
-    print(f"[train_two_tower] 完成，best val={best_val:.4f}")
+    print(f"[train_two_tower] Done，best val={best_val:.4f}")
 
 
 if __name__ == "__main__":

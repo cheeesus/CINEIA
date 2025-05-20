@@ -31,6 +31,10 @@ output/
 "outputs/" 
 "logs/" 
 "*.log" 
+env_rec/
+__pycache__/
+*.dist-info/
+*.egg-info/
 "# Checkpoints" 
 "checkpoints/" 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.

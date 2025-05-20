@@ -14,13 +14,13 @@ pip install --upgrade -r requirements.txt
 # 2  (optional) edit models/config.py to point to your PostgreSQL
 
 # 3  train / retrain the Two-Tower recall model
-python -m models.recall.train_two_tower  --epochs 3 --batch 128
+python -m DNN_TorchFM_TTower.models.recall.train_two_tower  --epochs 3 --batch 128
 
 # 4  train / retrain the DeepFM re-rank model
-python -m models.ranking.train_ranking   --epochs 3
+python -m DNN_TorchFM_TTower.models.ranking.train_ranking   --epochs 3
 
 # 5  run the interactive CLI demo (cold-start → warm-start → incremental retrain)
-python -m scripts.interactive_demo
+python -m DNN_TorchFM_TTower.scripts.interactive_demo
 
 ```
 

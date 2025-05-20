@@ -21,13 +21,14 @@ try:
 except ImportError:
     pass
 
-from models.db import (
+from DNN_TorchFM_TTower.models.db import (
     fetchone_dict, execute_sql,
     get_movie_titles, get_user_view_count,
 )
-from models.recall.train_incremental import incremental_train as recall_inc_train
-from models.ranking.train_ranking import main as ranking_train_main
-from service.recommender import recommend_movies_for_user
+
+from DNN_TorchFM_TTower.models.recall.train_incremental import incremental_train as recall_inc_train
+from DNN_TorchFM_TTower.models.ranking.train_ranking import main as ranking_train_main
+from DNN_TorchFM_TTower.service.recommender import recommend_movies_for_user
 
 TOP_N = 10
 LOOP_FOR_RETRAIN = 3      # 每 3 轮做一次增量重训（可调为 0 关闭）
@@ -77,10 +78,10 @@ def choose_movies(candidates: List[int], titles: dict[int, str]) -> List[int] | 
 #                         增量训练封装                                #
 # ------------------------------------------------------------------ #
 def incremental_retrain():
-    print("\n📈 Incremental training begins (recall 1 epoch + rerank 1 epoch)...")
+    print("\n Incremental training begins (recall 1 epoch + rerank 1 epoch)...")
     recall_inc_train(neg_ratio=1, epochs=1)
     ranking_train_main(epochs=1, batch_size=4096, neg_ratio=1)
-    print("📈 incremental training fini\n")
+    print("incremental training fini\n")
 
 
 # ------------------------------------------------------------------ #
@@ -94,24 +95,25 @@ def interactive_loop(user_id: int):
         viewed = get_user_view_count(user_id)
         print(f"\n=== user {user_id} has watched {viewed} films ===")
 
-        rec_ids = recommend_movies_for_user(user_id, n_final=TOP_N)
-        if not rec_ids:
-            print("⚠️  unable to fetch datas, please check the database connection")
+        mids, scores, strategy = recommend_movies_for_user(user_id, n_final=TOP_N)
+        if not mids:
+            print("  unable to fetch datas, please check the database connection")
             break
 
-        title_map = get_movie_titles(rec_ids)
-        chosen = choose_movies(rec_ids, title_map)
+        title_map = get_movie_titles(mids)
+        chosen = choose_movies(mids, title_map)
         if chosen is None:
             print("\n👋 Bye~")
             break
 
         insert_views(user_id, chosen)
-        print(f"✅ 已记录观看 {len(chosen)} 部影片。")
+        print(f" 已记录观看 {len(chosen)} 部影片。")
         loop_cnt += 1
 
         # ---- 条件触发增量训练 ----
         if LOOP_FOR_RETRAIN and loop_cnt % LOOP_FOR_RETRAIN == 0:
             incremental_retrain()
+
 
 
 # ------------------------------------------------------------------ #
