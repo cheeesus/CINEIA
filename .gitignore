@@ -1,45 +1,46 @@
-.pytest_cache/ 
-__pycache__/ 
-rec_env310/
-recommendation_ai/.pytest_cache/ 
-recommendation_ai/__pycache__/ 
-recommendation_ai/env_rec310/ 
-dnn_recommender/saved_model/*.pt 
-recommendation_ai/env_rec310/
-dnn_recoomender_stable/saved_model/ 
-DNN_TorchFM_TTower/saved_model/
-dnn_recommender_stable/saved_model/ 
-output/ 
-*.pt 
-*.h5 
-"# Python cache" 
-"__pycache__/" 
-"*.pyc" 
-"# Jupyter" 
-".ipynb_checkpoints/" 
-"# Virtual environments" 
-"env*/" 
-"venv*/" 
-"# ML model files" 
-"*.pt" 
-"*.pth" 
-"*.h5" 
-"*.ckpt" 
-"*.joblib" 
-"*.pkl" 
-"# Logs & outputs" 
-"outputs/" 
-"logs/" 
-"*.log" 
-env_rec/
+# Python cache
 __pycache__/
+*.pyc
+.pytest_cache/
 *.dist-info/
-*.egg-info/
-"# Checkpoints" 
-"checkpoints/" 
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+*.egg-info
 
-# dependencies
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+env*/
+venv*/
+rec_env310/
+recommendation_ai/env_rec310/
+env_rec/
+
+# Machine Learning model files
+*.pt
+*.pth
+*.h5
+*.ckpt
+*.joblib
+*.pkl
+
+# Saved models
+dnn_recommender/saved_model/*.pt
+dnn_recoomender_stable/saved_model/
+DNN_TorchFM_TTower/saved_model/
+recommendation_ai/.pytest_cache/
+recommendation_ai/__pycache__/
+
+# Logs & outputs
+output/
+outputs/
+logs/
+*.log
+
+# Checkpoints
+checkpoints/
+
+# Dependencies
 /node_modules
 /backend/node_modules
 /.pnp
@@ -50,36 +51,37 @@ __pycache__/
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
 
-# misc
+# Miscellaneous
 .DS_Store
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Environment files (can opt-in for committing if needed)
 .env*
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-
-#flask cache
+# Flask cache
 __pycache__/
+
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
