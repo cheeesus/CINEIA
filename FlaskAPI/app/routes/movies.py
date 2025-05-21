@@ -39,8 +39,8 @@ def get_movies_recent():
 
 @movies_bp.route('/top', methods=['GET'])
 def get_movies_top():
-    page = int(request.args.get('page', 1))  # Get the page number from query parameter (default is 1)
-    limit = int(request.args.get('limit', 24))  # Get the limit (number of movies per page)
+    page = int(request.args.get('page', 1))  # page number from query parameter (default is 1)
+    limit = int(request.args.get('limit', 24))  # limit (number of movies per page)
     
     offset = (page - 1) * limit  # Calculate the offset for SQL query
 

@@ -29,7 +29,7 @@ const MovieDetails = ({params}) => {
   useEffect(() => {
     const fetchMovie = async () => {
       try {
-        const response = await fetch(`http://127.0.0.1:5000/movies/${movieId}`);
+        const response = await fetch(`http://127.0.0.1:5000/api/movies/${movieId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch movie details");
         }
@@ -56,7 +56,7 @@ const MovieDetails = ({params}) => {
       if (isFavorite) {
         // If the movie is already a favorite, send a DELETE request to remove it
         await axios.delete(
-          `http://127.0.0.1:5000/movies/${movieId}/favorite`, // Use DELETE for removal
+          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`, // Use DELETE for removal
           {
             headers: { Authorization: `Bearer ${user?.token}` }, // Use token from context
           }
@@ -65,7 +65,7 @@ const MovieDetails = ({params}) => {
       } else {
         // If the movie is not a favorite, send a POST request to add it
         await axios.post(
-          `http://127.0.0.1:5000/movies/${movieId}/favorite`, // Use POST for addition
+          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`, // Use POST for addition
           {}, // No additional body is required for adding to favorites
           {
             headers: { Authorization: `Bearer ${user?.token}` }, // Use token from context
@@ -89,7 +89,7 @@ const MovieDetails = ({params}) => {
 
     try {
       await axios.post(
-        `http://127.0.0.1:5000/movies/${movieId}/rate`,
+        `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
         { movie_id: movieId, rating: newRating },
         { headers: { Authorization: `Bearer ${user?.token}` } } 
       );
@@ -107,7 +107,7 @@ const MovieDetails = ({params}) => {
 
     try {
       await axios.post(
-        `http://127.0.0.1:5000/movies/${movieId}/add-to-list`,
+        `http://127.0.0.1:5000/api/movies/${movieId}/add-to-list`,
         { movie_id: movieId, list_name: listName },
         { headers: { Authorization: `Bearer ${user?.token}` } } 
       );

@@ -9,11 +9,11 @@ def create_app():
     app.config.from_pyfile('config.py')
     # Enable CORS for all routes
     # CORS(app, supports_credentials=True)
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
-    #init db connection
+    # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
+    CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
+    # init db connection
     db_connect(app)
-
-    #register blueprints
+    # register blueprints
     register_routes(app)
 
     return app

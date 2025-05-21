@@ -13,7 +13,7 @@ const TopRatedSlider = () => {
   // Function to fetch recent movies with pagination
   const fetchTopMovies = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:5000/movies/top", {
+      const response = await axios.get("http://127.0.0.1:5000/api/movies/top", {
         params: {
           page: page,
           limit: 24,  // Limit the number of movies per request

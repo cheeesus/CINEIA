@@ -3,29 +3,29 @@ import Link from "next/link"; // Correct way to import Link from Next.js
 import axios from "axios"; // Use axios for API requests
 
 
-const RecentMoviesListSlider = () => {
-  const [recentMovies, setRecentMovies] = useState([]);
+const RecommendedSlider = () => {
+  const [recommendedMovies, setRecommendedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);  // Track the current page
   const [hasMore, setHasMore] = useState(true);  // Flag to check if there are more movies
   const sliderRef = useRef(null);
   // Function to fetch recent movies with pagination
-  const fetchRecentMovies = async () => {
+  const fetchRecommendedMovies = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:5000/api/movies/recent", {
+      const response = await axios.get("http://127.0.0.1:5000/api/recommend", {
         params: {
           page: page,
           limit: 24,  // Limit the number of movies per request
         },
       });
-      const newRecentMovies = response.data;
+      const newTopMovies = response.data;
 
-      if (newRecentMovies.length < 24) {
+      if (newTopMovies.length < 24) {
         setHasMore(false);  // If there are less than 24 movies, it's the last page
       }
 
-      setRecentMovies((prevMovies) => [...prevMovies, ...newRecentMovies]);
+      setTopMovies((prevMovies) => [...prevMovies, ...newTopMovies]);
       setLoading(false);
     } catch (err) {
       setError("Failed to load movies");
@@ -57,7 +57,7 @@ const RecentMoviesListSlider = () => {
   };
 // Fetch movies when the page number changes
   useEffect(() => {
-    fetchRecentMovies();
+    fetchTopMovies();
   }, [page]);
 
   // Load more movies when the button is clicked
@@ -81,7 +81,7 @@ const RecentMoviesListSlider = () => {
         <button className="scroll-btn left" onClick={scrollLeft}>←</button>
         
         <div className="movie-slider" ref={sliderRef}>
-          {recentMovies.map((movie) => (
+          {TopMovies.map((movie) => (
             movie.poster_url ? (
               <div key={movie.id} className="movie-item">
                 <Link href={`/movies/${movie.id}`}>
@@ -112,4 +112,4 @@ const RecentMoviesListSlider = () => {
   );
 };
 
-export default RecentMoviesListSlider;
+export default TopRatedSlider;

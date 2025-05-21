@@ -13,7 +13,7 @@ const RecentMoviesList = () => {
   // Function to fetch recent movies with pagination
   const fetchRecentMovies = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:5000/movies/", {
+      const response = await axios.get("http://127.0.0.1:5000/api/movies/recent", {
         params: {
           page: page,
           limit: 24,  // Limit the number of movies per request

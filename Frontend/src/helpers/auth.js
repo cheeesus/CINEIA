@@ -3,7 +3,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import {jwtDecode} from "jwt-decode"; // Install via npm: npm install jwt-decode
 
-const API_URL = "http://127.0.0.1:5000";
+const API_URL = "http://127.0.0.1:5000/api";
 
 // Register user
 export const registerUser = async (email, password, age, selectedGenres) => {

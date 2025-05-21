@@ -5,6 +5,6 @@ from app.routes.recommend import bp as rec_bp
 
 
 def register_routes(app):
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(movies_bp, url_prefix='/movies')
-    app.register_blueprint(rec_bp,    url_prefix='/api')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(movies_bp, url_prefix='/api/movies')
+    app.register_blueprint(rec_bp, url_prefix='/api')
