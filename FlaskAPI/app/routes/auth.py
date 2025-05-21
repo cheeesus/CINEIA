@@ -1,7 +1,7 @@
 # API/app/routes/auth.py
 import base64
 import binascii
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, make_response
 from app.utils.helpers import hash_password, verify_password, generate_token
 from app.connectDB import db_connect
 
@@ -13,21 +13,47 @@ def register():
     email = data.get('email')
     password = data.get('password')
     age = data.get('age')
+    selected_genres = data.get('selectedGenres')  # Expect an array of genre names
 
     # Hash password for security
     hashed_password = hash_password(password)
 
-    # Simple validation (you can improve this with more checks)
+    # Simple validation
     if not email or not password or not age:
         return jsonify({"error": "All fields are required"}), 400
-    
+
     try:
-        # Use the existing database connection from g.db
         cursor = g.db.cursor()
-        cursor.execute("INSERT INTO users (email, password_hash, age) VALUES (%s, %s, %s)", (email, hashed_password, age))
+
+        # Insert user into the `users` table and get user_id
+        cursor.execute(
+            "INSERT INTO users (email, password_hash, age) VALUES (%s, %s, %s) RETURNING id",
+            (email, hashed_password, age)
+        )
+        user_id = cursor.fetchone()[0]  # Fetch the generated user_id
+
+        # Map genre names to their IDs
+        if selected_genres and isinstance(selected_genres, list):
+            # Query to get genre IDs for the given genre names
+            format_strings = ','.join(['%s'] * len(selected_genres))
+            cursor.execute(
+                f"SELECT id FROM genres WHERE name IN ({format_strings})",
+                tuple(selected_genres)
+            )
+            genre_ids = [row[0] for row in cursor.fetchall()]
+
+            # Insert user preferences
+            preferences = [(user_id, genre_id) for genre_id in genre_ids]
+            cursor.executemany(
+                "INSERT INTO user_preferences (user_id, genre_id) VALUES (%s, %s)",
+                preferences
+            )
+
         g.db.commit()
         return jsonify({"message": "User registered successfully"}), 201
+
     except Exception as e:
+        g.db.rollback()  # Rollback in case of any error
         return jsonify({"error": str(e)}), 500
     
 @auth_bp.route('/login', methods=['POST'])
@@ -52,7 +78,9 @@ def login():
             print(f"Entered Password: {password}")
             if verify_password(password, user[2]) :
                 token = generate_token({"user_id": user[0], "email": user[1]})
-                return jsonify({"email": user[1], "token": token}), 200  
+                response = make_response(jsonify({"email": user[1], "token": token}))
+                response.set_cookie("token", token, httponly=True, secure=True)
+                return response, 200  
         
         # If authentication fails
         return jsonify({"error": "Invalid credentials"}), 401

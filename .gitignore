@@ -44,3 +44,4 @@ next-env.d.ts
 
 #flask cache
 /FlaskAPI/app/__pycache__
+__pycache__/
