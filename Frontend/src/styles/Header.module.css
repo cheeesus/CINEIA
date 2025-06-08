@@ -3,9 +3,10 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 20px;
-  background-color: #222;
-  color: #fff;
+  background-color: var(--background);
+  color: var(--text-color);
   font-family: var(--font-geist-mono);
+  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5);
 }
 
 .logo {
@@ -111,10 +112,16 @@
 
 .navLink {
   text-decoration: none;
-  color: #fff;
+  color: var(--text-color);
   font-weight: bold;
 }
 
-.navLink:hover {
-  text-decoration: underline;
+.buttons {
+  padding: 5px 10px;
+  background-color: brown;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-color);
+  cursor: pointer;
+  font-weight: bold;
 }

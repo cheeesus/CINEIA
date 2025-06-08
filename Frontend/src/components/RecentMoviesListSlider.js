@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import Link from "next/link"; // Correct way to import Link from Next.js
-import axios from "axios"; // Use axios for API requests
+import Link from "next/link"; 
+import axios from "axios"; 
 
 
 const RecentMoviesListSlider = () => {

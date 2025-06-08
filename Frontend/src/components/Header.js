@@ -64,6 +64,9 @@ export default function Header() {
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, []);
+  const handleLogin = () => {
+    router.push("/login")
+  }
 
   const handleLogout = () => {
     logout();
@@ -74,9 +77,8 @@ export default function Header() {
     <>
       <header className={styles.header}>
         <div className={styles.logo}>
-          <Image src="/CineIA.png" alt="CinéIA Logo" width={100} height={50} />
+          <Link href="/"><Image src="/CineIA.png" alt="CinéIA Logo" width={100} height={50} /></Link>
         </div>
-
         <div className={styles.search}>
           <div className={styles.searchWrapper}>
             <input
@@ -96,23 +98,22 @@ export default function Header() {
         {/* Navigation Menu */}
         <nav className={styles.nav}>
           <ul className={styles.navList}>
-            <li className={styles.navItem}>
-              <Link href="/" className={styles.navLink}>Home</Link>
-            </li>
             {isLoggedIn ? (
               <>
                 <li className={styles.navItem}>
                   <span className={styles.navLink}>Welcome, {user?.username}</span>
                 </li>
                 <li className={styles.navItem}>
-                  <button onClick={handleLogout} className={`${styles.navLink} ${styles.logoutButton}`}>
+                  <button onClick={handleLogout} className={styles.buttons}>
                     Logout
                   </button>
                 </li>
               </>
             ) : (
               <li className={styles.navItem}>
-                <Link href="/login" className={styles.navLink}>Login</Link>
+                <button onClick={handleLogin} className={styles.buttons}>
+                  Login
+                </button>
               </li>
             )}
           </ul>

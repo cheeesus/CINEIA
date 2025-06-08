@@ -87,6 +87,8 @@ const MovieDetails = ({params}) => {
       return;
     }
 
+
+
     try {
       await axios.post(
         `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
@@ -120,7 +122,16 @@ const MovieDetails = ({params}) => {
   if (!movie) {
     return <div>Loading movie details...</div>;
   }
-
+  
+  // Function to format the date
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
   return (
     <div>
       <Header />
@@ -171,7 +182,7 @@ const MovieDetails = ({params}) => {
                 </div>
               </div>
             )}
-            <p><strong>Release Date:</strong> {movie.release_date}</p>
+            <p><strong>Release Date:</strong> {formatDate(movie.release_date)}</p>
             <p><strong>Director:</strong> {movie.director}</p>
             <p className={styles.overview}>{movie.overview}</p>
           </div>
