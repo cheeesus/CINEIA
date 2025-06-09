@@ -7,6 +7,7 @@ import { FiPlus } from "react-icons/fi";
 import Header from "@/components/Header";
 import styles from "@/styles/movieDetails.module.css";
 import { UserContext } from "@/context/UserContext";
+import { User } from 'lucide-react';
 
 const MovieDetails = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);
@@ -15,6 +16,8 @@ const MovieDetails = ({params}) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [rating, setRating] = useState(0);
   const [showListModal, setShowListModal] = useState(false);
+  const [existingLists, setExistingLists] = useState([]); // List of user's lists
+  const [newListName, setNewListName] = useState(""); // Name for new list
 
   // Unwrap params and set movieId
   useEffect(() => {
@@ -44,7 +47,29 @@ const MovieDetails = ({params}) => {
     if (movieId) {
       fetchMovie();
     }
-  }, [movieId]);
+  }, [movieId]); // Only re-run if movieId changes
+
+  // Fetch user's lists
+  useEffect(() => {
+  const fetchLists = async () => {
+    if (!user || !user.userId) {
+      console.log("User not available yet.");
+      return; // Exit if user is not yet set
+    }
+
+    try {
+      const response = await axios.get(`http://127.0.0.1:5000/api/users/${user.userId}/lists`, {
+        headers: { Authorization: `Bearer ${user?.token}` },
+      });
+      console.log(response.data);
+      setExistingLists(response.data);
+    } catch (error) {
+      console.error("Failed to fetch lists:", error);
+    }
+  };
+
+  fetchLists();
+}, [user]); // Runs only once on mount
 
   const handleFavoriteToggle = async () => {
     if (!isLoggedIn) {
@@ -86,9 +111,6 @@ const MovieDetails = ({params}) => {
       alert("You need to be logged in to rate a movie.");
       return;
     }
-
-
-
     try {
       await axios.post(
         `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
@@ -101,21 +123,54 @@ const MovieDetails = ({params}) => {
     }
   };
 
+  // Handle adding to an existing list
+  const handleAddToExistingList = async (listId) => {
+    try {
+        const response = await axios.post(
+            `http://127.0.0.1:5000/api/users/${user.userId}/${listId}/add`,
+            { movieId },
+            { headers: { Authorization: `Bearer ${user?.token}` } }
+        );
+
+        if (response.status === 200) {
+            alert("Movie added to list!");
+            setShowListModal(false);
+        } else {
+            console.error("Unexpected response:", response);
+            alert("Failed to add movie to list. Please try again later.");
+        }
+    } catch (error) {
+        if (error.response?.status === 409) {
+            // Movie already exists
+            alert("This movie is already in the list.");
+        } else {
+            // Other errors
+            console.error("Failed to add movie to list:", error);
+            alert("Failed to add movie. Please try again.");
+        }
+    }
+  };
+
+
+  // Handle creating a new list
   const handleAddToList = async (listName) => {
     if (!isLoggedIn) {
       alert("You need to be logged in to add to a list.");
       return;
     }
+    if (!listName.trim()) {
+      alert("List name cannot be empty.");
+      return;
+    }
 
     try {
-      await axios.post(
-        `http://127.0.0.1:5000/api/movies/${movieId}/add-to-list`,
+      const response = await axios.post(`http://127.0.0.1:5000/api/movies/${movieId}/add-to-list`, 
         { movie_id: movieId, list_name: listName },
-        { headers: { Authorization: `Bearer ${user?.token}` } } 
-      );
-      alert(`Movie added to the list: ${listName}`);
-    } catch (err) {
-      alert("Failed to add the movie to the list.");
+        { headers: { Authorization: `Bearer ${user?.token}` } });
+      setExistingLists((prev) => [...prev, response.data]); // Add new list to state
+      alert("New list created and movie added!");
+    } catch (error) {
+      console.error("Failed to create new list:", error);
     }
   };
 
@@ -168,6 +223,24 @@ const MovieDetails = ({params}) => {
               <div className={styles.listModal}>
                 <div className={styles.modalContent}>
                   <h3>Add to List</h3>
+
+                  {/*Display existing lists */}
+                  <div className={styles.existingLists}>
+                    {existingLists.length > 0 ? (
+                      <ul>
+                        {existingLists.map((list) => (
+                          <li key={list.list_id}>
+                            <button onClick={() => handleAddToExistingList(list.list_id)}>
+                              {list.list_name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>No lists available. Create a new one!</p>
+                    )}
+                  </div>
+
                   <input
                     type="text"
                     placeholder="Enter new list name"
@@ -178,7 +251,7 @@ const MovieDetails = ({params}) => {
                       }
                     }}
                   />
-                  <button onClick={() => setShowListModal(false)}>Cancel</button>
+                  <button className={styles.closeBtn} onClick={() => setShowListModal(false)}>Cancel</button>
                 </div>
               </div>
             )}

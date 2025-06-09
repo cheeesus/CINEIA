@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState, useContext } from "react";
 import Header from "@/components/Header";
-import "../styles/movieSlider.css";
 import RecentMoviesList from "@/components/RecentMoviesListSlider"; // Assuming you have this component for listing movies
 import TopRatedSlider from "@/components/TopRatedSlider"
 import Recommended from "@/components/Recommended"
@@ -14,7 +13,7 @@ export default function Home() {
       <Header />
       <main>
         {isLoggedIn ? (
-          <><h2>Recommended For You</h2><Recommended /></>
+          <><h1>Recommended For You</h1><Recommended /></>
         ) : ( <></>)
         }
         <h1>Recent Releases</h1>

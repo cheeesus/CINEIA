@@ -1,9 +1,12 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
+import { UserContext } from "@/context/UserContext";
+import styles from "@/styles/movieSlider.module.css"
 import Link from "next/link"; 
 import axios from "axios"; 
 
 
 const RecentMoviesListSlider = () => {
+  const { user, isLoggedIn } = useContext(UserContext);
   const [recentMovies, setRecentMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,6 +70,24 @@ const RecentMoviesListSlider = () => {
     }
   };
 
+  const handleMovieClick = async (movieId) => {
+    if (!isLoggedIn || !user?.userId || !user?.token) {
+      console.log("User not logged in. Skipping view history recording.");
+      return;
+    }
+
+    try {
+      await axios.post(
+        `http://127.0.0.1:5000/api/movies/${user.userId}/history`,
+        { movie_id: movieId },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+      console.log("Movie added to view history.");
+    } catch (err) {
+      console.error("Failed to add movie to view history:", err);
+    }
+  };
+
   // Display loading message or error message
   if (loading) {
     return <div>Loading movies...</div>;
@@ -77,18 +98,18 @@ const RecentMoviesListSlider = () => {
   }
   return (
     <>
-      <div className="movie-slider-container">
-        <button className="scroll-btn left" onClick={scrollLeft}>←</button>
+      <div className={styles.movieSliderContainer}>
+        <button className={styles.scrollBtnLeft} onClick={scrollLeft}>←</button>
         
-        <div className="movie-slider" ref={sliderRef}>
+        <div className={styles.movieSlider} ref={sliderRef}>
           {recentMovies.map((movie) => (
             movie.poster_url ? (
-              <div key={movie.id} className="movie-item">
+              <div key={movie.id} className={styles.movieItem} onClick={() => handleMovieClick(movie.id)}>
                 <Link href={`/movies/${movie.id}`}>
                   <img 
                     src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} 
                     alt={movie.title} 
-                    className="movie-poster" 
+                    className={styles.moviePoster} 
                   />
                   <h3>{movie.title}</h3>
                   <span>{formatDate(movie.release_date)}</span>
@@ -98,12 +119,12 @@ const RecentMoviesListSlider = () => {
           ))}
         </div>
 
-        <button className="scroll-btn right" onClick={scrollRight}>→</button>
+        <button className={styles.scrollBtnRight} onClick={scrollRight}>→</button>
       </div>
 
       {hasMore && (
         <Link href="/movies">
-          <button onClick={loadMore} className="load-more-btn">
+          <button onClick={loadMore} className={styles.loadMoreBtn}>
             Load More
           </button>
         </Link>

@@ -1,26 +1,12 @@
-h1 {
-  position: relative; 
-  display: inline-block; 
-  padding: 10px 0; 
-}
 
-h1::after {
-  content: ""; 
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 50%; 
-  height: 4px; 
-  background-color: rgb(198, 198, 198); 
-}
-.movie-slider-container {
+.movieSliderContainer {
 position: relative;
 width: 100%;
 height: fit-content;
 overflow: hidden; 
 }
 
-.movie-slider {
+.movieSlider {
 display: flex;
 gap: 16px;
 overflow-x: auto;
@@ -31,23 +17,25 @@ scrollbar-width: none;
 padding: 10px 0;
 }
 
-.movie-item {
+.movieItem {
 min-width: 200px; 
 }
 
-.movie-poster {
+.moviePoster {
 width: 200px; 
 height: 300px; 
 border-radius: 8px;
 object-fit: cover; 
 }
-.movie-item h3 {
+.movieItem h3 {
 font-size: medium;
 }
-.movie-item span {
+.movieItem span {
 font-size: small;
 }
-.scroll-btn {
+
+.scrollBtnLeft {
+left: 10px;
 position: absolute;
 top: 50%;
 transform: translateY(-50%);
@@ -60,15 +48,21 @@ cursor: pointer;
 z-index: 1;
 }
 
-.scroll-btn.left {
-left: 10px;
-}
-
-.scroll-btn.right {
+.scrollBtnRight {
 right: 10px;
+position: absolute;
+top: 50%;
+transform: translateY(-50%);
+background: rgba(0, 0, 0, 0.5);
+color: white;
+padding: 10px;
+font-size: 24px;
+border: none;
+cursor: pointer;
+z-index: 1;
 }
 
-.load-more-btn {
+.loadMoreBtn {
 padding: 10px 10px;
 font-size: 16px;
 background-color: transparent;
@@ -81,7 +75,7 @@ cursor: pointer;
 border-radius: 5px;
 }
 
-.load-more-btn:hover {
+.loadMoreBtn:hover {
 text-decoration: underline;
 font-weight: bold;
 }

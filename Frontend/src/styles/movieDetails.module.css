@@ -56,7 +56,29 @@
     width: 300px;
     text-align: center;
 }
-
+.modalContent h3 {
+    margin-bottom: 10px;
+}
+.existingLists {
+    text-align: left;
+}
+.existingLists ul {
+    list-style-type: none;
+}
+.existingLists li {
+    padding: 8px ;
+    border-bottom: 2px #fff;
+    cursor: pointer;
+    text-align: center;
+}
+.existingLists li:hover {
+    background-color: #1f1f1f;
+}
+.existingLists button {
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+}
 .modalContent input {
     width: 100%;
     padding: 8px;
@@ -64,7 +86,7 @@
     border-radius: 2px;
     border: none;
 }
-.modalContent button {
+.closeBtn {
     padding: 6px;
     background-color: brown;
     border: none;

@@ -32,9 +32,12 @@ const UserProfile = ({params}) => {
   useEffect(() => {
     const fetchProfile = async () => {
         try {
+          console.log(user.token);
+          
             const response = await axios.get(`http://127.0.0.1:5000/api/users/${userId}`, {
                 headers: { Authorization: `Bearer ${user?.token}` },
             });
+            console.log(response.data);
             setProfileData(response.data);
             setCheckedMovies(response.data.checked_movies || []);
             setSelectedGenres(response.data.genres?.map(g => g.genre_name) || []);
@@ -49,12 +52,18 @@ const UserProfile = ({params}) => {
   }, [userId, user]);
 
   if(!profileData) {
-    return <div>Loading profile...</div>
+    return (
+      <>
+        <Header/>
+        <div>Loading profile...</div>
+      </>);
   }
 
   const toggleGenre = (genre) => {
-    setSelectedGenres(prev =>
-      prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]
+    setSelectedGenres((prev) =>
+      prev.includes(genre)
+        ? prev.filter((g) => g !== genre) // Deselect if already selected
+        : [...prev, genre]               // Add if not selected
     );
   };
 
@@ -79,6 +88,15 @@ const UserProfile = ({params}) => {
       setIsSaving(false);
     }
   };
+  // Function to format the date
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
 
   return (
     <div>
@@ -86,7 +104,7 @@ const UserProfile = ({params}) => {
       <main className={styles.container}>
         {/* User Details */}
         <div className={styles.profileDetails}>
-          <h1>Welcome, {user?.username}</h1>
+          <h2>Welcome, {user?.username}</h2>
           <table className={styles.detailsTable}>
             <tbody>
               <tr>
@@ -105,7 +123,7 @@ const UserProfile = ({params}) => {
                     {allGenres.map((genre) => (
                       <label key={genre} style={{ marginRight: 10 }}>
                         <input
-                          type="radio"
+                          type="checkbox"
                           checked={selectedGenres.includes(genre)}
                           onChange={() => toggleGenre(genre)}
                         />
@@ -130,14 +148,14 @@ const UserProfile = ({params}) => {
               <thead>
                 <tr>
                   <th>Title</th>
-                  <th>Rating</th>
+                  <th>Viewed at</th>
                 </tr>
               </thead>
               <tbody>
                 {checkedMovies.map((movie) => (
                   <tr key={movie.id}>
                     <td>{movie.title}</td>
-                    <td>{movie.rating}</td>
+                    <td>{formatDate(movie.date)}</td>
                   </tr>
                 ))}
               </tbody>

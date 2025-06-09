@@ -16,14 +16,17 @@ def generate_token(payload):
 def token_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Extract token and verify logic
-        token = request.headers.get('Authorization')
+        token = request.headers.get('Authorization', None)
         if not token:
-            return jsonify({"error": "Token missing"}), 403
+            return jsonify({'message': 'Token is missing!'}), 403
+        
         try:
-            user = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
-            g.user_id = user["user_id"]  # Set `g.user_id` globally
+            token = token.split("Bearer ")[1]  # Extract token part
+            user_data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
+            g.user = user_data  # Attach user info to Flask's `g` object
         except Exception as e:
-            return jsonify({"error": "Token invalid or expired"}), 403
+            return jsonify({'message': 'Token is invalid!', 'error': str(e)}), 403
+
         return f(*args, **kwargs)
     return decorated_function
+

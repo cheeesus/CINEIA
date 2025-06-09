@@ -68,7 +68,8 @@ export const getCurrentUser = () => {
     return { 
       username: decoded.email.split("@")[0], // Extract username from email
       email: decoded.email, // Store full email if needed
-      userId: decoded.user_id // Store user ID
+      userId: decoded.user_id, // Store user ID
+      token: token
     };
   } catch (error) {
     return null;
