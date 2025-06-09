@@ -1,6 +1,7 @@
-Flask
+flask
 psycopg2
 python-dotenv
 pyjwt
 flask_cors
 bcrypt
+flask-jwt-extended

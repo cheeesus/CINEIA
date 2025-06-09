@@ -111,19 +111,26 @@ def search_movies():
         return jsonify({"error": "Search query is required"}), 400
 
     offset = (page - 1) * limit  # Calculate offset for pagination
+    query_terms = query.split()
+    like_patterns = [f"%{term}%" for term in query_terms]
 
+    # Dynamically create the SQL placeholders
+    title_conditions = " OR ".join(["m.title ILIKE %s"] * len(query_terms))
+    keyword_conditions = " OR ".join(["k.name = %s"] * len(query_terms))
+
+    query_values = like_patterns + query_terms + [limit, offset]
     with g.db.cursor() as cursor:
-        # Use ILIKE for case-insensitive search in PostgreSQL
-        cursor.execute(
-            """
-            SELECT id, title, vote_average, release_date, poster_path 
-            FROM movies 
-            WHERE title ILIKE %s 
-            ORDER BY release_date DESC 
-            LIMIT %s OFFSET %s
-            """, 
-            (f"%{query}%", limit, offset)
-        )
+        cursor.execute(f"""
+            SELECT m.id, m.title, m.vote_average, m.release_date, m.poster_path
+            FROM movies m
+            LEFT JOIN movie_keyword mk ON m.id = mk.movie_id
+            LEFT JOIN keywords k ON mk.keyword_id = k.id
+            WHERE ({title_conditions})
+            OR ({keyword_conditions})
+            GROUP BY m.id
+            ORDER BY m.release_date DESC
+            LIMIT %s OFFSET %s;
+            """, query_values)
 
         movies = cursor.fetchall()
         movies_list = [
@@ -138,7 +145,6 @@ def search_movies():
         ]
 
     return jsonify({"movies": movies_list}), 200
-
 
 @movies_bp.route('/<int:movie_id>/add-to-list', methods=['POST'])
 @token_required

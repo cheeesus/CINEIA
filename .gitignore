@@ -15,6 +15,7 @@ venv*/
 rec_env310/
 recommendation_ai/env_rec310/
 env_rec/
+.env
 
 # Machine Learning model files
 *.pt

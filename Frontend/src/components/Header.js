@@ -6,6 +6,7 @@ import axios from "axios";
 import { UserContext } from '@/context/UserContext';
 import styles from "../styles/Header.module.css";
 import { Search, X } from "lucide-react";
+import { FaSignInAlt, FaSignOutAlt, FaUser, FaListAlt } from "react-icons/fa";
 
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,7 +25,7 @@ export default function Header() {
       }
 
       try {
-        const response = await axios.get("http://127.0.0.1:5000/movies/search", {
+        const response = await axios.get("http://127.0.0.1:5000/api/movies/search", {
           params: { query: searchQuery },
         });
 
@@ -80,7 +81,7 @@ export default function Header() {
           <Link href="/"><Image src="/CineIA.png" alt="CinéIA Logo" width={100} height={50} /></Link>
         </div>
         <div className={styles.search}>
-          <div className={styles.searchWrapper}>
+          <div className={styles.searchWrapper} style={{ position: 'relative' }}>
             <input
               type="text"
               placeholder="Search for movies..."
@@ -89,9 +90,36 @@ export default function Header() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowDropdown(true)}
             />
-            <button className={styles.searchButton}>
-              <Search size={18} />
-            </button>
+            {showDropdown ? (
+              <button
+                className={styles.closeButton}
+                onClick={() => setShowDropdown(false)}
+                aria-label="Close search dropdown"
+              >
+                <X size={20} />
+              </button>
+            ) : (
+              <button className={styles.searchButton} aria-label="Search">
+                <Search size={18} />
+              </button>
+            )}
+
+            {showDropdown && searchResults.length > 0 && (
+              <div className={styles.searchOverlay} ref={dropdownRef}>
+                <div className={styles.searchResults}>
+                  {searchResults.map((movie) => (
+                    <Link
+                      key={movie.id}
+                      href={`/movies/${movie.id}`}
+                      className={styles.resultItem}
+                      onClick={() => setShowDropdown(false)}
+                    >
+                      <span>{movie.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -103,16 +131,26 @@ export default function Header() {
                 <li className={styles.navItem}>
                   <span className={styles.navLink}>Welcome, {user?.username}</span>
                 </li>
+                <li className={styles.navItem} >
+                  <Link key={user.userId} href={`/user/${user.userId}`}>
+                    <FaUser size={20}/>
+                  </Link>
+                </li>
+                <li className={styles.navItem} >
+                  <Link href={`/${user.id}/lists`} >
+                    <FaListAlt size={25} />
+                  </Link>
+                </li>
                 <li className={styles.navItem}>
                   <button onClick={handleLogout} className={styles.buttons}>
-                    Logout
+                    Logout <FaSignOutAlt style={{ paddingLeft: "3px", width: "20px"}}/>
                   </button>
                 </li>
               </>
             ) : (
               <li className={styles.navItem}>
                 <button onClick={handleLogin} className={styles.buttons}>
-                  Login
+                  Login <FaSignInAlt style={{ paddingLeft: "3px", width: "20px"}} />
                 </button>
               </li>
             )}
@@ -120,21 +158,6 @@ export default function Header() {
         </nav>
       </header>
 
-      {/* Search Dropdown Overlay */}
-      {showDropdown && searchResults.length > 0 && (
-        <div className={styles.searchOverlay} ref={dropdownRef}>
-          <button className={styles.closeButton} onClick={() => setShowDropdown(false)}>
-            <X size={20} />
-          </button>
-          <div className={styles.searchResults}>
-            {searchResults.map((movie) => (
-              <Link key={movie.id} href={`/movies/${movie.id}`} className={styles.resultItem} onClick={() => setShowDropdown(false)}>
-                <span>{movie.title}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }
