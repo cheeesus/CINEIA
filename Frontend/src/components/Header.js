@@ -137,7 +137,7 @@ export default function Header() {
                   </Link>
                 </li>
                 <li className={styles.navItem} >
-                  <Link href={`/${user.id}/lists`} >
+                  <Link href={`/user/${user.userId}/lists`} >
                     <FaListAlt size={25} />
                   </Link>
                 </li>

@@ -99,12 +99,13 @@ const UserProfile = ({params}) => {
   };
 
   return (
-    <div>
+    <div className={styles.background}>
       <Header />
       <main className={styles.container}>
         {/* User Details */}
         <div className={styles.profileDetails}>
           <h2>Welcome, {user?.username}</h2>
+          <h1>Personal details</h1>
           <table className={styles.detailsTable}>
             <tbody>
               <tr>
@@ -142,7 +143,7 @@ const UserProfile = ({params}) => {
 
         {/* Checked Movies */}
         <div className={styles.checkedMovies}>
-          <h2>History of Checked Movies</h2>
+          <h1>History of Checked Movies</h1>
           {checkedMovies.length > 0 ? (
             <table className={styles.moviesTable}>
               <thead>

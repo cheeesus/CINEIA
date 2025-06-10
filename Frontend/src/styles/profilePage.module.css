@@ -1,9 +1,17 @@
+.background {
+    background-image: url('/background.jpg');
+    background-repeat: repeat-y;
+    background-size: cover;
+}
 .container {
-  margin: 0% 15%;
+  width: 60%;
+  background-color: rgba(26, 23, 23, 0.942);
+  color: rgb(229, 229, 229);
+  padding: 0 2em ;
+  margin: auto;
 }
 
 .profileDetails {
-  background-color: #1e1e1e;
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 2rem;
@@ -14,7 +22,7 @@
 }
 .detailsTable,
 .moviesTable {
-  width: 70%;
+  width: 100%;
   margin: auto;
   border-collapse: collapse;
   margin-bottom: 20px;
@@ -52,9 +60,6 @@
 }
 .genresList input {
     margin-right: 5px;
-}
-.moviesTable tr:nth-child(even) {
-  background-color: #f9f9f9;
 }
 .checkedMovies {
   margin-top: 2rem;

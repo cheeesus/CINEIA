@@ -1,0 +1,159 @@
+'use client';  // This marks the component as a client component
+import { useEffect, useState, useContext } from 'react';
+import axios from "axios";
+import Header from "@/components/Header";
+import styles from "@/styles/listsDetails.module.css";
+import { UserContext } from "@/context/UserContext";
+import { FaTrash } from "react-icons/fa";
+
+const ListsDetails = () => {
+  const { user, isLoggedIn } = useContext(UserContext);
+  const [existingLists, setExistingLists] = useState([]); // List of user's lists
+
+  // Fetch user's lists
+  useEffect(() => {
+    const fetchListsAndMovies = async () => {
+        if (!user || !user.userId) {
+        console.log("User not available yet.");
+        return; // Exit if user is not yet set
+        }
+
+        try {
+        // Fetch lists
+        const listsResponse = await axios.get(
+            `http://127.0.0.1:5000/api/users/${user.userId}/lists`,
+            { headers: { Authorization: `Bearer ${user?.token}` } }
+        );
+
+        const lists = listsResponse.data;
+        console.log("Fetched lists:", lists);
+
+        // Fetch movies for each list
+        const listsWithMovies = await Promise.all(
+            lists.map(async (list) => {
+            try {
+                const moviesResponse = await axios.get(
+                `http://127.0.0.1:5000/api/movies/${list.list_id}/movies`,
+                { headers: { Authorization: `Bearer ${user?.token}` } }
+                );
+
+                const movieIds = moviesResponse.data.movie_ids;
+                
+                // Fetch movie names for each ID
+                const moviesWithNames = await Promise.all(
+                movieIds.map(async (movieId) => {
+                    try {
+                    const movieDetailsResponse = await axios.get(
+                        `http://127.0.0.1:5000/api/movies/${movieId}`,
+                        { headers: { Authorization: `Bearer ${user?.token}` } }
+                    );
+                    
+                    return movieDetailsResponse.data;
+                    } catch (error) {
+                    console.error(`Failed to fetch details for movie ${movieId}:`, error);
+                    return { id: movieId, name: "Unknown Movie" }; // Default to unknown movie
+                    }
+                })
+                );
+
+                return { ...list, movies: moviesWithNames };
+            } catch (error) {
+                console.error(`Failed to fetch movies for list ${list.id}:`, error);
+                return { ...list, movies: [] }; // Default to empty movies if fetch fails
+            }
+            })
+        );
+
+        console.log("Lists with movie details:", listsWithMovies);
+        setExistingLists(listsWithMovies); // Update state with lists and movies with names
+        } catch (error) {
+        console.error("Failed to fetch lists:", error);
+        }
+    };
+
+    fetchListsAndMovies();
+    }, [user]);
+
+    // Delete a list
+  const deleteList = async (listId) => {
+    if (!window.confirm("Are you sure you want to delete this list?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `http://127.0.0.1:5000/api/movies/${listId}`,
+        { headers: { Authorization: `Bearer ${user?.token}` } }
+      );
+
+      // Remove the list from state
+      setExistingLists((prevLists) => prevLists.filter((list) => list.list_id !== listId));
+      window.alert("List deleted successfully!");
+    } catch (error) {
+        window.alert("Failed to delete list!");
+      console.error("Failed to delete list:", error);
+    }
+  };
+
+
+
+  if (!isLoggedIn) {
+    return (
+      <>
+        <Header />
+        <div>Please log in to view your lists.</div>
+      </>
+    );
+  }
+
+  return (
+    <div className={styles.background}>
+      <Header />
+      <main className={styles.container}>
+        {/* Lists Details */}
+        <div className={styles.listsDetails}>
+          <table className={styles.listsTable}>
+            <thead>
+              <tr>
+                <th>List Name</th>
+                <th>Movies</th>
+                <th></th> 
+              </tr>
+            </thead>
+            <tbody>
+              {existingLists.length > 0 ? (
+                existingLists.map((list) => (
+                  <tr key={list.list_id}>
+                    <td>{list.list_name}</td>
+                    <td>
+                      {/* Assuming movies are fetched along with lists */}
+                      {list.movies && list.movies.length > 0 ? (
+                        list.movies.map((movie) => (
+                          <div key={movie}>{movie.title}</div>
+                        ))
+                      ) : (
+                        <span>No movies in this list.</span>
+                      )}
+                    </td>
+                    <td>
+                      <FaTrash
+                        className={styles.deleteIcon}
+                        onClick={() => deleteList(list.list_id)}
+                      />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={2}>No lists available. Create a new one!</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default ListsDetails;

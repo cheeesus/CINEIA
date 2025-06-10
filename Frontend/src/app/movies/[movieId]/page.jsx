@@ -7,7 +7,6 @@ import { FiPlus } from "react-icons/fi";
 import Header from "@/components/Header";
 import styles from "@/styles/movieDetails.module.css";
 import { UserContext } from "@/context/UserContext";
-import { User } from 'lucide-react';
 
 const MovieDetails = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);
@@ -17,7 +16,6 @@ const MovieDetails = ({params}) => {
   const [rating, setRating] = useState(0);
   const [showListModal, setShowListModal] = useState(false);
   const [existingLists, setExistingLists] = useState([]); // List of user's lists
-  const [newListName, setNewListName] = useState(""); // Name for new list
 
   // Unwrap params and set movieId
   useEffect(() => {
@@ -51,25 +49,60 @@ const MovieDetails = ({params}) => {
 
   // Fetch user's lists
   useEffect(() => {
-  const fetchLists = async () => {
-    if (!user || !user.userId) {
-      console.log("User not available yet.");
-      return; // Exit if user is not yet set
-    }
+    const fetchLists = async () => {
+      if (!user || !user.userId) {
+        console.log("User not available yet.");
+        return; // Exit if user is not yet set
+      }
 
-    try {
-      const response = await axios.get(`http://127.0.0.1:5000/api/users/${user.userId}/lists`, {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      console.log(response.data);
-      setExistingLists(response.data);
-    } catch (error) {
-      console.error("Failed to fetch lists:", error);
-    }
-  };
+      try {
+        const response = await axios.get(`http://127.0.0.1:5000/api/users/${user.userId}/lists`, {
+          headers: { Authorization: `Bearer ${user?.token}` },
+        });
+        console.log(response.data);
+        setExistingLists(response.data);
+      } catch (error) {
+        console.error("Failed to fetch lists:", error);
+      }
+    };
 
-  fetchLists();
-}, [user]); // Runs only once on mount
+    fetchLists();
+  }, [user]); // Runs only once on mount
+
+  useEffect(() => {
+    const fetchFavoriteStatus = async () => {
+      if (!user || !user.userId) {
+        console.log("User not available yet.");
+        return; // Exit if user is not yet set
+      }
+      try {
+        const response = await axios.get(
+          `http://127.0.0.1:5000/api/users/${user.userId}/lists`, // Endpoint to fetch lists
+          { headers: { Authorization: `Bearer ${user?.token}` } }
+        );
+        
+        const favoritesList = response.data.find((list) => list.list_name === "favorites");
+        console.log(favoritesList);
+        
+        if (favoritesList) {
+          // Fetch movies in the "Favorites" list
+          const response = await axios.get(
+            `http://127.0.0.1:5000/api/movies/${favoritesList['list_id']}/movies`,
+            { headers: { Authorization: `Bearer ${user?.token}` } }
+          );
+          const moviesInFavorites = response.data['movie_ids'];
+          const isFavorited = moviesInFavorites.some((movie) => String(movie) === movieId);
+          setIsFavorite(isFavorited);
+        }
+      } catch (error) {
+        console.error("Failed to fetch favorite status:", error);
+      }
+    };
+
+    if (isLoggedIn && movieId) {
+      fetchFavoriteStatus();
+    }
+  }, [isLoggedIn, movieId, user]);
 
   const handleFavoriteToggle = async () => {
     if (!isLoggedIn) {
@@ -79,21 +112,21 @@ const MovieDetails = ({params}) => {
 
     try {
       if (isFavorite) {
-        // If the movie is already a favorite, send a DELETE request to remove it
+        // Remove from favorites
         await axios.delete(
-          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`, // Use DELETE for removal
+          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`,
           {
-            headers: { Authorization: `Bearer ${user?.token}` }, // Use token from context
+            headers: { Authorization: `Bearer ${user?.token}` },
           }
         );
         alert("Movie removed from favorites.");
       } else {
-        // If the movie is not a favorite, send a POST request to add it
+        // Add to favorites
         await axios.post(
-          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`, // Use POST for addition
-          {}, // No additional body is required for adding to favorites
+          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`,
+          {},
           {
-            headers: { Authorization: `Bearer ${user?.token}` }, // Use token from context
+            headers: { Authorization: `Bearer ${user?.token}` },
           }
         );
         alert("Movie added to favorites.");
@@ -102,7 +135,8 @@ const MovieDetails = ({params}) => {
       // Toggle the isFavorite state
       setIsFavorite((prev) => !prev);
     } catch (err) {
-      alert("Failed to update favorites.");
+      console.error("Failed to update favorites:", err);
+      alert("An error occurred while updating favorites.");
     }
   };
 
@@ -111,15 +145,24 @@ const MovieDetails = ({params}) => {
       alert("You need to be logged in to rate a movie.");
       return;
     }
+
     try {
-      await axios.post(
+      const response = await axios.post(
         `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
         { movie_id: movieId, rating: newRating },
-        { headers: { Authorization: `Bearer ${user?.token}` } } 
+        { headers: { Authorization: `Bearer ${user?.token}` } }
       );
-      setRating(newRating);
-    } catch (err) {
-      alert("Failed to submit rating.");
+
+      if (response.status === 200) {
+        setRating(newRating); // Update local rating state
+        alert("Your rating has been submitted!");
+      } else {
+        console.error("Unexpected response:", response);
+        alert("Failed to submit rating.");
+      }
+    } catch (error) {
+      console.error("Failed to submit rating:", error);
+      alert("An error occurred. Please try again.");
     }
   };
 
@@ -175,7 +218,12 @@ const MovieDetails = ({params}) => {
   };
 
   if (!movie) {
-    return <div>Loading movie details...</div>;
+    return (
+      <>
+        <Header/>
+        <div>Loading movie details...</div>
+      </>
+    );
   }
   
   // Function to format the date

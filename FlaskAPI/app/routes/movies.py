@@ -244,12 +244,11 @@ def add_movie_to_list(movie_id : int):
 
 @movies_bp.route('/<int:movie_id>/rate', methods=['POST'])
 @token_required
-def rate_movie():
-    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
-    user_id = g.user_id  # Use user_id from the token
+def rate_movie(movie_id : int):
+    user_id = g.user['user_id']  # Use user_id from the token
 
     data = request.get_json()
-    rating = data.get('rating')
+    rating = data.get('rating') * 2
 
     if not (0 <= rating <= 10):
         return jsonify({'error': 'Rating must be between 0 and 10'}), 400
@@ -257,7 +256,7 @@ def rate_movie():
     with g.db.cursor() as cursor:
         # Insert or update the rating for the movie by the user
         cursor.execute("""
-            INSERT INTO ratings (user_id, movie_id, rating)
+            INSERT INTO users_ratings (user_id, movie_id, rating)
             VALUES (%s, %s, %s)
             ON CONFLICT (user_id, movie_id)
             DO UPDATE SET rating = EXCLUDED.rating
@@ -268,21 +267,29 @@ def rate_movie():
 
 @movies_bp.route('/<int:movie_id>/favorite', methods=['POST'], endpoint="add_favorite")
 @token_required
-def add_movie_to_favorites():
-    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
-    user_id = g.user_id  # Use user_id from the token
+def add_movie_to_favorites(movie_id: int):
+    user_id = g.user['user_id']  # Use user_id from the token
 
     with g.db.cursor() as cursor:
-        # Ensure the "favorites" list exists for the user
+        # Try inserting the favorites list, or do nothing if it exists
         cursor.execute("""
             INSERT INTO lists (user_id, name)
             VALUES (%s, 'favorites')
             ON CONFLICT (user_id, name) DO NOTHING
             RETURNING id
         """, (user_id,))
-        favorites_list_id = cursor.fetchone()[0]
+        result = cursor.fetchone()
 
-        # Add the movie to the "favorites" list
+        if result is None:
+            # favorites list already exists, fetch its id
+            cursor.execute("""
+                SELECT id FROM lists WHERE user_id = %s AND name = 'favorites'
+            """, (user_id,))
+            result = cursor.fetchone()
+        
+        favorites_list_id = result[0]
+
+        # Add the movie to the favorites list
         cursor.execute("""
             INSERT INTO list_movies (list_id, movie_id)
             VALUES (%s, %s)
@@ -292,11 +299,11 @@ def add_movie_to_favorites():
 
     return jsonify({"message": "Movie added to favorites successfully"}), 200
 
+
 @movies_bp.route('/<int:movie_id>/favorite', methods=['DELETE'], endpoint="remove_favorite")
 @token_required
-def remove_movie_from_favorites():
-    movie_id = request.view_args['movie_id']  # Extract movie_id from the route
-    user_id = g.user_id  # Use user_id from the token
+def remove_movie_from_favorites(movie_id : int):
+    user_id = g.user['user_id']  # Use user_id from the token
 
     with g.db.cursor() as cursor:
         # Remove the movie from the "favorites" list
@@ -309,3 +316,27 @@ def remove_movie_from_favorites():
         g.db.commit()
 
     return jsonify({"message": "Movie removed from favorites successfully"}), 200
+
+@movies_bp.route('/<int:list_id>/movies', methods=['GET'])
+@token_required
+def get_all_movies_in_list(list_id: int):
+    with g.db.cursor() as cursor : 
+        cursor.execute("""
+            SELECT movie_id FROM list_movies WHERE list_id = %s 
+        """, (list_id,))
+        movies = cursor.fetchall()
+        movie_ids = [movie[0] for movie in movies]
+
+        return jsonify({"movie_ids": movie_ids})
+    
+@movies_bp.route('/<int:list_id>', methods=['DELETE'])
+@token_required
+def delete_list(list_id: int):
+    with g.db.cursor() as cursor:
+        # Delete the list's movies
+        cursor.execute("DELETE FROM list_movies WHERE list_id = %s", (list_id,))
+        # Delete the list itself
+        cursor.execute("DELETE FROM lists WHERE id = %s", (list_id,))
+        g.db.commit()
+        return jsonify({"message": "List deleted successfully"}), 200
+

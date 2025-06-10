@@ -1,0 +1,56 @@
+.background {
+    background-image: url('/background.jpg');
+    background-repeat: repeat-y;
+    background-size: cover;
+}
+.container {
+    width: 60%;
+    background-color: rgba(26, 23, 23, 0.942);
+    color: rgb(229, 229, 229);
+    padding: 0 2em ;
+    margin: auto;
+    height: 100vh;
+}
+
+.listsDetails {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+.listsDetails h2 {
+    text-align: center;
+    padding-bottom: 3rem;
+}
+.listsTable{
+  width: 100%;
+  margin: auto;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.listsTable th{
+  text-align: left;
+  background-color: black;
+  border-bottom: 1px solid #ddd;
+  padding: 8px;
+}
+
+.listsTable td{
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+.listssTable button {
+  padding: 7px 7px;
+  background-color: brown;
+  border: none;
+  border-radius: 2px;
+  color: var(--text-color);
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  justify-items: space-between;
+  margin-top: 10px;
+}
+.deleteIcon {
+    cursor: pointer;
+}
