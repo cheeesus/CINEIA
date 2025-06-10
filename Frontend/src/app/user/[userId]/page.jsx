@@ -37,7 +37,6 @@ const UserProfile = ({params}) => {
             const response = await axios.get(`http://127.0.0.1:5000/api/users/${userId}`, {
                 headers: { Authorization: `Bearer ${user?.token}` },
             });
-            console.log(response.data);
             setProfileData(response.data);
             setCheckedMovies(response.data.checked_movies || []);
             setSelectedGenres(response.data.genres?.map(g => g.genre_name) || []);

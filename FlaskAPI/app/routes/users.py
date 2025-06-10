@@ -6,48 +6,74 @@ users_bp = Blueprint('users', __name__)
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @token_required
-def get_user_details(user_id): 
-    with g.db.cursor() as cursor:
-        cursor.execute("""
-            SELECT 
-                u.id AS user_id,
-                u.email AS user_email,
-                u.age AS user_age,
-                g.id AS genre_id,
-                g.name AS genre_name,
-                vh.movie_id AS viewed_movie_id,
-                m.title AS viewed_movie_title,
-                vh.view_date AS view_date
-            FROM 
-                users u
-            LEFT JOIN 
-                user_preferences up ON u.id = up.user_id
-            LEFT JOIN 
-                genres g ON up.genre_id = g.id
-            LEFT JOIN 
-                view_history vh ON u.id = vh.user_id
-            LEFT JOIN 
-                movies m ON vh.movie_id = m.id
-            WHERE 
-                u.id = %s;
-        """, (user_id,))
-        result = cursor.fetchall()
-    
-    if result:
-        user_details = {
-            "user_id": result[0][0],
-            "email": result[0][1],
-            "age": result[0][2],
-            "genres": [{"genre_id": row[3], "genre_name": row[4]} for row in result if row[3]],
-            "checked_movies": [
-                {"movie_id": row[5], "title": row[6], "date": row[7]} 
-                for row in result if row[5]
-            ]
-        }
-        print(user_details)
-        return jsonify(user_details), 200
-    else:
-        return jsonify({'error': 'User not found'}), 404
+def get_user_details(user_id):
+    try:
+        with g.db.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    u.id AS user_id,
+                    u.email AS user_email,
+                    u.age AS user_age,
+                    g.id AS genre_id,
+                    g.name AS genre_name,
+                    vh.movie_id AS viewed_movie_id,
+                    m.title AS viewed_movie_title,
+                    vh.view_date AS view_date
+                FROM
+                    users u
+                LEFT JOIN
+                    user_preferences up ON u.id = up.user_id
+                LEFT JOIN
+                    genres g ON up.genre_id = g.id
+                LEFT JOIN
+                    view_history vh ON u.id = vh.user_id
+                LEFT JOIN
+                    movies m ON vh.movie_id = m.id
+                WHERE
+                    u.id = %s;
+            """, (user_id,))
+            result = cursor.fetchall()
+
+        if result:
+            # Initialize sets to store unique genres and viewed movies
+            # Sets are used for efficient uniqueness checking
+            unique_genres = set()
+            unique_checked_movies = set()
+
+            user_details = {
+                "user_id": result[0][0],
+                "email": result[0][1],
+                "age": result[0][2],
+                "genres": [], # Will be populated with unique genres
+                "checked_movies": [] # Will be populated with unique movies
+            }
+
+            for row in result:
+                # Add unique genres
+                genre_id, genre_name = row[3], row[4]
+                if genre_id is not None and (genre_id, genre_name) not in unique_genres:
+                    user_details["genres"].append({"genre_id": genre_id, "genre_name": genre_name})
+                    unique_genres.add((genre_id, genre_name))
+
+                # Add unique checked movies
+                movie_id, movie_title, view_date = row[5], row[6], row[7]
+                if movie_id is not None and (movie_id, movie_title, view_date) not in unique_checked_movies:
+                    # Convert date to string for JSON serialization
+                    user_details["checked_movies"].append({
+                        "movie_id": movie_id,
+                        "title": movie_title,
+                        "date": str(view_date) if view_date else None
+                    })
+                    unique_checked_movies.add((movie_id, movie_title, view_date))
+
+            print(user_details)
+            return jsonify(user_details), 200
+        else:
+            return jsonify({'error': 'User not found'}), 404
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return jsonify({"message": "An internal server error occurred."}), 500
 
 
 @users_bp.route('/<int:user_id>/genres', methods=['PUT'])
@@ -160,3 +186,55 @@ def add_to_existing_list(user_id: int, list_id: int):
     except Exception as e:
         g.db.rollback()  # Rollback in case of any error
         return jsonify({"error": f"Failed to add movie to list: {str(e)}"}), 500
+
+@users_bp.route('/<int:user_id>/popular-by-preference', methods=['GET'])
+@token_required
+def get_popular_movies_by_user_preferences(user_id: int):
+    try:
+        with g.db.cursor() as cursor:
+            # 1. Fetch user's preferred genre IDs and names
+            # Join user_preferences with the genres table to get the genre name
+            cursor.execute("""
+                SELECT up.genre_id, g.name AS genre_name
+                FROM user_preferences up
+                JOIN genres g ON up.genre_id = g.id
+                WHERE up.user_id = %s
+            """, (user_id,))
+            preferred_genres = cursor.fetchall()
+
+            if not preferred_genres:
+                return jsonify({"message": "No preferred genres found for this user."}), 404
+
+            # 2. Fetch most popular movies for each preferred genre
+            genre_movie_map = {}
+            for genre_id, genre_name in preferred_genres:
+                # Assuming 'popularity' column exists in the 'movies' table
+                # If not, use m.release_date DESC or another metric
+                cursor.execute("""
+                    SELECT m.id, m.title, m.poster_path, m.release_date, m.popularity
+                    FROM movies m
+                    JOIN movie_genre mg ON m.id = mg.movie_id
+                    WHERE mg.genre_id = %s
+                    ORDER BY m.popularity DESC
+                    LIMIT 10
+                """, (genre_id,))
+                movies = cursor.fetchall()
+
+                # Convert tuple results to dictionaries for better readability in JSON
+                genre_movie_map[genre_name] = [
+                    {
+                        "movie_id": movie[0],
+                        "title": movie[1],
+                        "poster_url": "https://image.tmdb.org/t/p/w500" + movie[2] if movie[2] else None,
+                        "release_date": str(movie[3]), 
+                        "popularity": movie[4]
+                    }
+                    for movie in movies
+                ]
+
+        return jsonify({"popular_movies": genre_movie_map}), 200
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        # Log the error for debugging
+        return jsonify({"message": "An internal server error occurred."}), 500

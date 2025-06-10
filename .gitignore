@@ -29,6 +29,7 @@ env_rec/
 dnn_recommender/saved_model/*.pt
 dnn_recoomender_stable/saved_model/
 DNN_TorchFM_TTower/saved_model/
+saved_model/
 recommendation_ai/.pytest_cache/
 recommendation_ai/__pycache__/
 

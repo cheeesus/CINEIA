@@ -115,7 +115,6 @@ const TopRatedSlider = () => {
             ) : null
           ))}
         </div>
-
         <button className={styles.scrollBtnRight} onClick={scrollRight}>→</button>
       </div>
 
