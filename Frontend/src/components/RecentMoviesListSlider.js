@@ -37,6 +37,17 @@ const RecentMoviesListSlider = () => {
       setLoading(false);
     }
   };
+  // Fetch movies when the page number changes
+  useEffect(() => {
+    fetchRecentMovies();
+  }, [page]);
+
+  // Load more movies when the button is clicked
+  const loadMore = () => {
+    if (hasMore) {
+      setPage(page + 1);  // Load the next page
+    }
+  };
 
   // Scroll the slider left
   const scrollLeft = () => {
@@ -60,17 +71,7 @@ const RecentMoviesListSlider = () => {
       year: 'numeric'
     }).format(date);
   };
-// Fetch movies when the page number changes
-  useEffect(() => {
-    fetchRecentMovies();
-  }, [page]);
 
-  // Load more movies when the button is clicked
-  const loadMore = () => {
-    if (hasMore) {
-      setPage(page + 1);  // Load the next page
-    }
-  };
 
   const handleMovieClick = async (movieId) => {
     if (!isLoggedIn || !user?.userId || !user?.token) {
@@ -131,11 +132,9 @@ const RecentMoviesListSlider = () => {
       </div>
 
       {hasMore && (
-        <Link href="/movies">
-          <button onClick={loadMore} className={styles.loadMoreBtn}>
-            Load More
-          </button>
-        </Link>
+        <button  onClick={loadMore} className={styles.loadMoreBtn}>
+          Load More
+        </button>
       )}
     </>
   );

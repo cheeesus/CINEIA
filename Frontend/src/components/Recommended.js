@@ -19,6 +19,7 @@ const RecommendedSlider = () => {
 
     try {
       setLoading(true);
+      console.log(user.userId)
       const response = await axios.get(`http://127.0.0.1:5000/api/movies/${user.userId}/recommend`, {
         params: {
           page: page,
@@ -30,7 +31,6 @@ const RecommendedSlider = () => {
       if (newRecommendedMovies.length < 24) {
         setHasMore(false); // If there are fewer than 24 movies, it's the last page
       }
-
       setRecommendedMovies(newRecommendedMovies);
     } catch (err) {
       setError("Failed to load movies");
@@ -133,11 +133,9 @@ const RecommendedSlider = () => {
         </div>
 
         {hasMore && (
-          <Link href="/movies">
-            <button onClick={loadMore} className={styles.loadMoreBtn}>
-              Load More
-            </button>
-          </Link>
+          <button  onClick={loadMore} className={styles.loadMoreBtn}>
+            Load More
+          </button>
         )}
       </>
     );

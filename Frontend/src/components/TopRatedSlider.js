@@ -125,11 +125,9 @@ const TopRatedSlider = () => {
       </div>
 
       {hasMore && (
-        <Link href="/movies">
-          <button onClick={loadMore} className={styles.loadMoreBtn}>
-            Load More
-          </button>
-        </Link>
+        <button  onClick={loadMore} className={styles.loadMoreBtn}>
+          Load More
+        </button>
       )}
     </>
   );

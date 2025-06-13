@@ -266,6 +266,7 @@ const MovieDetails = ({params}) => {
               <p><strong>Release Date:</strong> {formatDate(movie.release_date)}</p>
               <p><strong>Director:</strong> {movie.director}</p>
               <p><strong>Duration:</strong> {movie.runtime} minutes</p>
+              <p><strong>Genres:</strong> {movie.genres.join(', ')}</p>  
             </div>
             <div className={styles.movieActions}>
               <span>{movie.vote_average > 0 ? <> {movie.vote_average} ({movie.vote_count})</>: ""}</span>

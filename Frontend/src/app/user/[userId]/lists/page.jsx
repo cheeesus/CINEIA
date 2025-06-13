@@ -4,7 +4,7 @@ import axios from "axios";
 import Header from "@/components/Header";
 import styles from "@/styles/listsDetails.module.css";
 import { UserContext } from "@/context/UserContext";
-import { FaTrash } from "react-icons/fa";
+import { FaTrash, FaTimes } from "react-icons/fa";
 
 const ListsDetails = () => {
   const { user, isLoggedIn } = useContext(UserContext);
@@ -94,6 +94,37 @@ const ListsDetails = () => {
       console.error("Failed to delete list:", error);
     }
   };
+  const deleteMovie = async (listId, movieId) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce film de la liste ?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `http://127.0.0.1:5000/api/movies/${listId}/movies/${movieId}`,
+        { headers: { Authorization: `Bearer ${user?.token}` } }
+      );
+
+      // Mettre à jour l'état pour retirer le film de la liste
+      setExistingLists((prevLists) =>
+        prevLists.map((list) => {
+          if (list.list_id === listId) {
+            return {
+              ...list,
+              movies: list.movies.filter((movie) => movie.id !== movieId),
+            };
+          }
+          return list;
+        })
+      );
+
+      window.alert("Film supprimé avec succès !");
+    } catch (error) {
+      window.alert("Échec de la suppression du film !");
+      console.error("Échec de la suppression du film :", error);
+    }
+  };
+
 
 
 
@@ -126,13 +157,18 @@ const ListsDetails = () => {
                   <tr key={list.list_id}>
                     <td>{list.list_name}</td>
                     <td>
-                      {/* Assuming movies are fetched along with lists */}
                       {list.movies && list.movies.length > 0 ? (
                         list.movies.map((movie) => (
-                          <div key={movie}>{movie.title}</div>
+                          <div key={movie.id}>
+                            {movie.title}
+                            <FaTimes
+                              className={styles.deleteIcon}
+                              onClick={() => deleteMovie(list.list_id, movie.id)}
+                            />
+                          </div>
                         ))
                       ) : (
-                        <span>No movies in this list.</span>
+                        <span>Aucun film dans cette liste.</span>
                       )}
                     </td>
                     <td>

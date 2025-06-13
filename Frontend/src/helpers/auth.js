@@ -24,7 +24,8 @@ export const registerUser = async (email, password, age, selectedGenres) => {
 export const loginUser = async (email, password) => {
   try {
     const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-    const { token, email: userEmail } = response.data;
+    console.log(response.data);
+    const { user_id: userId, token, email: userEmail } = response.data;
 
     // Extract the first part of the email as username
     const username = userEmail.split("@")[0];
@@ -32,7 +33,7 @@ export const loginUser = async (email, password) => {
     // Store token in cookies (secure: true for HTTPS, httpOnly should be set in backend)
     Cookies.set("token", token, { expires: 0.5, secure: true , sameSite: "Strict" });
 
-    return { token, username };
+    return { userId, token, username };
   } catch (error) {
     throw new Error(error.response?.data?.error || "Login failed");
   }

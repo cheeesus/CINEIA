@@ -78,10 +78,9 @@ def login():
             print(f"Entered Password: {password}")
             if verify_password(password, user[2]) :
                 token = generate_token({"user_id": user[0], "email": user[1]})
-                response = make_response(jsonify({"email": user[1], "token": token}))
+                response = make_response(jsonify({"user_id": user[0], "email": user[1], "token": token}))
                 response.set_cookie("token", token, httponly=True, secure=True)
                 return response, 200  
-        
         # If authentication fails
         return jsonify({"error": "Invalid credentials"}), 401
     except Exception as e:

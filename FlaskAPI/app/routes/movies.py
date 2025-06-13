@@ -121,6 +121,14 @@ def get_movie_details(movie_id: int):
         if not movie:
             return jsonify({'error': 'Movie not found'}), 404
         
+        cursor.execute("""
+            SELECT g.name 
+            FROM movie_genre mg
+            JOIN genres g ON mg.genre_id = g.id
+            WHERE mg.movie_id = %s
+        """, (movie_id,))
+        genres = cursor.fetchall()
+        
         # Récupérer les acteurs du film avec leurs rôles et URL de profil
         cursor.execute("""
             SELECT a.id, a.actor_name, a.profile_path, c.movie_character
@@ -147,6 +155,7 @@ def get_movie_details(movie_id: int):
         'vote_average': movie[12],
         'vote_count': movie[13],
         'backdrop_url': "https://image.tmdb.org/t/p/w500" + movie[14] if movie[14] else None,
+        'genres': [genre[0] for genre in genres],
         'actors': []
     }
     
@@ -375,3 +384,20 @@ def delete_list(list_id: int):
         g.db.commit()
         return jsonify({"message": "List deleted successfully"}), 200
 
+@movies_bp.route('/<int:list_id>/movies/<int:movie_id>', methods=['DELETE'])
+@token_required
+def delete_movie_from_list(list_id: int, movie_id: int):
+    with g.db.cursor() as cursor:
+        # Vérifier si le film appartient à la liste
+        cursor.execute("""
+            SELECT * FROM list_movies WHERE list_id = %s AND movie_id = %s
+        """, (list_id, movie_id))
+        movie_entry = cursor.fetchone()
+        if not movie_entry:
+            return jsonify({"message": "Movie not found in the specified list"}), 404
+        # Supprimer le film de la liste
+        cursor.execute("""
+            DELETE FROM list_movies WHERE list_id = %s AND movie_id = %s
+        """, (list_id, movie_id))
+        g.db.commit()
+        return jsonify({"message": "Movie deleted successfully from the list"}), 200

@@ -20,9 +20,8 @@ export default function Login() {
     e.preventDefault();
     try {
       const response = await loginUser(email, password);  // Login user
-      const { token, username: username } = response;  // Destructure token and username from the response
-      login({ username, token });  // Set user context with email and token
-      console.log(response.username);
+      const { userId, token, username: username, } = response;  // Destructure token and username from the response
+      login({ userId, username, token });  // Set user context with email and token
       router.push("/");  // Redirect to the home page after successful login
     } catch (err) {
       setError(err.message);

@@ -74,13 +74,13 @@ font-size: small;
 }
 
 .loadMoreBtn {
-padding: 10px 10px;
+padding-bottom: 10px;
 font-size: 16px;
 background-color: transparent;
 color: rgba(255, 255, 255, 0.866);
 position: relative;
-bottom: 35%;
-right: 10px;
+width: 100%;
+text-align: right;
 border: none;
 cursor: pointer;
 border-radius: 5px;
