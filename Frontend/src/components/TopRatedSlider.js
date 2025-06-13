@@ -26,7 +26,7 @@ const TopRatedSlider = () => {
         setHasMore(false);  // If there are less than 24 movies, it's the last page
       }
 
-      setTopMovies((prevMovies) => [...prevMovies, ...newTopMovies]);
+      setTopMovies(newTopMovies);
       setLoading(false);
     } catch (err) {
       setError("Failed to load movies");
@@ -96,26 +96,32 @@ const TopRatedSlider = () => {
   return (
     <>
       <div className={styles.movieSliderContainer}>
-        <button className={styles.scrollBtnLeft} onClick={scrollLeft}>←</button>
+        <button className={styles.scrollBtnLeft} onClick={scrollLeft}>&#60;</button>
         
         <div className={styles.movieSlider} ref={sliderRef}>
           {TopMovies.map((movie) => (
-            movie.poster_url ? (
+            (movie.poster_url && movie.rating > 0 && movie.rating < 10) ? (
               <div key={movie.id} className={styles.movieItem} onClick={() => handleMovieClick(movie.id)}>
                 <Link href={`/movies/${movie.id}`}>
                   <img 
                     src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} 
                     alt={movie.title} 
-                    className={styles.moviePoster}
+                    className={styles.moviePoster} 
                   />
-                  <h3>{movie.title}</h3>
-                  <span>{formatDate(movie.release_date)}</span>
+                  <div className={styles.info}>
+                    <div>
+                      <h3>{movie.title}</h3>
+                      <span>{formatDate(movie.release_date)}</span>
+                    </div>
+                    <span>{movie.rating}</span>
+                  </div>
+                  
                 </Link>
               </div>
             ) : null
           ))}
         </div>
-        <button className={styles.scrollBtnRight} onClick={scrollRight}>→</button>
+        <button className={styles.scrollBtnRight} onClick={scrollRight}>&#62;</button>
       </div>
 
       {hasMore && (

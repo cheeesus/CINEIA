@@ -23,8 +23,13 @@ export default function Home() {
         <h1>Top Rated</h1>
         <TopRatedSlider />
         <br/>   
-        <h1>Popular by genre</h1>
-        <PopularMoviesByPreference />  
+        {isLoggedIn ? (
+          <>
+          <h1>Popular by genre</h1>
+          <PopularMoviesByPreference /> 
+          </>
+          ) : ( <></>)
+        }
       </main>
     </div>
   );

@@ -13,7 +13,7 @@ def register():
     email = data.get('email')
     password = data.get('password')
     age = data.get('age')
-    selected_genres = data.get('selectedGenres')  # Expect an array of genre names
+    selected_genres = data.get('selectedGenres')  
 
     # Hash password for security
     hashed_password = hash_password(password)

@@ -24,15 +24,14 @@ def recommend(user_id: int):
     with g.db.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, title, release_date, poster_path 
+            SELECT id, title, release_date, poster_path, vote_average
             FROM movies 
-            WHERE id = ANY(%s)
+            WHERE id = ANY(%s) AND vote_average > 0
             """, 
             (mids_py,)
         )
-        movie_details = {row[0]: {"title": row[1], "release_date": row[2], "poster_url": f"https://image.tmdb.org/t/p/w500{row[3]}" if row[3] else None} 
+        movie_details = {row[0]: {"title": row[1], "release_date": row[2], "poster_url": f"https://image.tmdb.org/t/p/w500{row[3]}" if row[3] else None, 'rating': row[4]} 
                          for row in cursor.fetchall()}
-
     # Step 3: Build response with details
     return jsonify({
         "user_id": user_id,
@@ -44,6 +43,7 @@ def recommend(user_id: int):
                 "title": movie_details.get(mid, {}).get("title", "Unknown"),
                 "release_date": movie_details.get(mid, {}).get("release_date"),
                 "poster_url": movie_details.get(mid, {}).get("poster_url"),
+                "rating": movie_details.get(mid, {}).get("rating"),
                 "score": float(scores[i]) if scores[i] is not None else None
             }
             for i, mid in enumerate(mids_py)
@@ -59,9 +59,11 @@ def get_movies_recent():
 
     with g.db.cursor() as cursor:
         cursor.execute("""
-            SELECT id, title, release_date, poster_path
+            SELECT id, title, release_date, poster_path, vote_average
             FROM movies 
-            ORDER BY release_date DESC LIMIT %s OFFSET %s
+            WHERE vote_average > 0
+            ORDER BY release_date DESC 
+            LIMIT %s OFFSET %s
         """, (limit, offset))
         movies = cursor.fetchall()
         movies_list = [
@@ -69,7 +71,8 @@ def get_movies_recent():
             'id': movie[0],
             'title': movie[1],
             'release_date': movie[2],
-            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[3]}" if movie[3] else None
+            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[3]}" if movie[3] else None,
+            'rating': movie[4]
         }
         for movie in movies
     ]
@@ -84,8 +87,9 @@ def get_movies_top():
 
     with g.db.cursor() as cursor:
         cursor.execute("""
-            SELECT id, title, release_date, poster_path
+            SELECT id, title, release_date, poster_path, vote_average
             FROM movies
+            WHERE vote_average > 0
             ORDER BY vote_average DESC LIMIT %s OFFSET %s
         """, (limit, offset))
         movies = cursor.fetchall()
@@ -94,44 +98,72 @@ def get_movies_top():
             'id': movie[0],
             'title': movie[1],
             'release_date': movie[2],
-            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[3]}" if movie[3] else None
+            'poster_url': f"https://image.tmdb.org/t/p/w500{movie[3]}" if movie[3] else None,
+            'rating': movie[4]
         }
         for movie in movies
     ]
     return jsonify(movies_list), 200
 
 @movies_bp.route('/<int:movie_id>', methods=['GET'])
-def get_movie_details(movie_id : int):
+def get_movie_details(movie_id: int):
     with g.db.cursor() as cursor:
+        # Récupérer les informations du film
         cursor.execute("""
             SELECT id, title, overview, poster_path, release_date, director, 
                    is_adult, budget, original_language, popularity, revenue, 
-                   runtime, vote_average, vote_count
+                   runtime, vote_average, vote_count, backdrop_path
             FROM movies 
             WHERE id = %s
         """, (movie_id,))
         movie = cursor.fetchone()
-    if movie:
-        movie_details = {
-            'id': movie[0],
-            'title': movie[1],
-            'overview': movie[2],
-            'poster_url': "https://image.tmdb.org/t/p/w500" + movie[3] if movie[3] else None,
-            'release_date': movie[4],
-            'director': movie[5],
-            'is_adult': movie[6],
-            'budget': movie[7],
-            'original_language': movie[8],
-            'popularity': movie[9],
-            'revenue': movie[10],
-            'runtime': movie[11],
-            'vote_average': movie[12],
-            'vote_count': movie[13]
-        }
-        return jsonify(movie_details), 200
-    else:
-        return jsonify({'error': 'Movie not found'}), 404
+        
+        if not movie:
+            return jsonify({'error': 'Movie not found'}), 404
+        
+        # Récupérer les acteurs du film avec leurs rôles et URL de profil
+        cursor.execute("""
+            SELECT a.id, a.actor_name, a.profile_path, c.movie_character
+            FROM actors a
+            JOIN casting c ON a.id = c.actor_id
+            WHERE c.movie_id = %s
+        """, (movie_id,))
+        actors = cursor.fetchall()
+        
+    # Formater les informations du film
+    movie_details = {
+        'id': movie[0],
+        'title': movie[1],
+        'overview': movie[2],
+        'poster_url': "https://image.tmdb.org/t/p/w500" + movie[3] if movie[3] else None,
+        'release_date': movie[4],
+        'director': movie[5],
+        'is_adult': movie[6],
+        'budget': movie[7],
+        'original_language': movie[8],
+        'popularity': movie[9],
+        'revenue': movie[10],
+        'runtime': movie[11],
+        'vote_average': movie[12],
+        'vote_count': movie[13],
+        'backdrop_url': "https://image.tmdb.org/t/p/w500" + movie[14] if movie[14] else None,
+        'actors': []
+    }
     
+    # Ajouter les informations des acteurs
+    for actor in actors:
+        movie_details['actors'].append({
+            'actor_id': actor[0],
+            'actor_name': actor[1],
+            'profile_url': "https://image.tmdb.org/t/p/w500" + actor[2] if actor[2] else None,
+            'character': actor[3]
+        })
+    
+    return jsonify(movie_details), 200
+
+
+
+
 # add movie to view history
 @movies_bp.route('/<int:user_id>/history', methods=['POST'])
 @token_required
@@ -179,7 +211,7 @@ def search_movies():
     query_values = like_patterns + query_terms + [limit, offset]
     with g.db.cursor() as cursor:
         cursor.execute(f"""
-            SELECT m.id, m.title
+            SELECT m.id, m.title, m.release_date, m.poster_path, m.vote_average
             FROM movies m
             LEFT JOIN movie_keyword mk ON m.id = mk.movie_id
             LEFT JOIN keywords k ON mk.keyword_id = k.id
@@ -195,6 +227,9 @@ def search_movies():
             {
                 'id': movie[0],
                 'title': movie[1],
+                'release_date': movie[2],
+                'poster_url': "https://image.tmdb.org/t/p/w500" + movie[3] if movie[3] else None,
+                'rating': movie[4]
             }
             for movie in movies
         ]
@@ -248,7 +283,7 @@ def rate_movie(movie_id : int):
     user_id = g.user['user_id']  # Use user_id from the token
 
     data = request.get_json()
-    rating = data.get('rating') * 2
+    rating = data.get('rating') 
 
     if not (0 <= rating <= 10):
         return jsonify({'error': 'Rating must be between 0 and 10'}), 400

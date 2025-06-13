@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useContext } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -73,6 +74,11 @@ export default function Header() {
     logout();
     router.push("/");
   }
+  const handleSearch = (e) => {
+    if (e.key === 'Enter') {
+      router.push(`/search/${searchQuery}`)
+    }
+  }
 
   return (
     <>
@@ -89,6 +95,7 @@ export default function Header() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowDropdown(true)}
+              onKeyDown={handleSearch}
             />
             {showDropdown ? (
               <button

@@ -1,4 +1,3 @@
-
 'use client';  // This marks the component as a client component
 import { useEffect, useState, useContext } from 'react';
 import axios from "axios";
@@ -19,33 +18,45 @@ const MovieDetails = ({params}) => {
 
   // Unwrap params and set movieId
   useEffect(() => {
-    const getMovieId = async () => {
-      const resolvedParams = await params;
-      setMovieId(resolvedParams.movieId);
+    let isMounted = true; // To prevent setting state on unmounted component
+    const resolveParams = async () => {
+      try {
+        const resolvedParams = await params; // Assume params is a promise
+        if (isMounted) setMovieId(resolvedParams.movieId);
+      } catch (error) {
+        console.error("Error resolving params:", error);
+      }
     };
-    getMovieId();
+    resolveParams();
+
+    return () => {
+      isMounted = false;
+    };
   }, [params]);
 
   // Fetch movie details
   useEffect(() => {
-    const fetchMovie = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/api/movies/${movieId}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch movie details");
-        }
-        const data = await response.json();
-        setMovie(data);
-        setRating(data.user_rating || 0);
-      } catch (err) {
-        console.error(err);
+  const fetchMovie = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:5000/api/movies/${movieId}`, {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch movie details");
       }
-    };
-
-    if (movieId) {
-      fetchMovie();
+      const data = await response.json();
+      setMovie(data);
+      console.log(data.user_rating);
+      setRating(data.user_rating || 0); // Default to 0 if user_rating is not available
+    } catch (err) {
+      console.error(err);
     }
-  }, [movieId]); // Only re-run if movieId changes
+  };
+
+  if (movieId) {
+    fetchMovie();
+  }
+}, [movieId, user]);
 
   // Fetch user's lists
   useEffect(() => {
@@ -149,12 +160,12 @@ const MovieDetails = ({params}) => {
     try {
       const response = await axios.post(
         `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
-        { movie_id: movieId, rating: newRating },
+        { movie_id: movieId, rating: newRating * 2 },
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );
 
       if (response.status === 200) {
-        setRating(newRating); // Update local rating state
+        setRating(newRating * 2); // Update local rating state
         alert("Your rating has been submitted!");
       } else {
         console.error("Unexpected response:", response);
@@ -239,17 +250,32 @@ const MovieDetails = ({params}) => {
     <div>
       <Header />
       <main className={styles.container}>
-          <img className={styles.moviePoster} src={movie.poster_url || "https://via.placeholder.com/500x750?text=No+Image+Available"} alt={movie.title} />
-          <div className={styles.details}>
-            <h1>{movie.title}</h1>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+          <img
+            width={1000}
+            height={562}
+            className={styles.moviePoster}
+            src={movie.backdrop_url || "https://via.placeholder.com/500x750?text=No+Image+Available"}
+            alt={movie.title}
+          />
+        </div>
+        <div className={styles.details}>
+          <h1>{movie.title}</h1>
+          <div style={{ display: 'flex', flexDirection: 'row' , justifyContent: 'space-between'}}>
+            <div>
+              <p><strong>Release Date:</strong> {formatDate(movie.release_date)}</p>
+              <p><strong>Director:</strong> {movie.director}</p>
+              <p><strong>Duration:</strong> {movie.runtime} minutes</p>
+            </div>
             <div className={styles.movieActions}>
+              <span>{movie.vote_average > 0 ? <> {movie.vote_average} ({movie.vote_count})</>: ""}</span>
               {/* 5-Star Rating */}
               <div className={styles.rating}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <FaStar
                     key={star}
                     size={24}
-                    color={star <= rating ? "#FFD700" : "#E0E0E0"}
+                    color={star <= rating/2 ? "#FFD700" : "#E0E0E0"}
                     onClick={() => handleRating(star)}
                     style={{ cursor: isLoggedIn ? "pointer" : "not-allowed" }}
                   />
@@ -263,53 +289,72 @@ const MovieDetails = ({params}) => {
               {/* Add to List Button */}
               <button onClick={() => setShowListModal(true)} className={styles.addToListBtn}>
                 <FiPlus size={24} />
-                Add to List
               </button>
             </div>
-            {/* List Modal */}
-            {showListModal && (
-              <div className={styles.listModal}>
-                <div className={styles.modalContent}>
-                  <h3>Add to List</h3>
-
-                  {/*Display existing lists */}
-                  <div className={styles.existingLists}>
-                    {existingLists.length > 0 ? (
-                      <ul>
-                        {existingLists.map((list) => (
-                          <li key={list.list_id}>
-                            <button onClick={() => handleAddToExistingList(list.list_id)}>
-                              {list.list_name}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p>No lists available. Create a new one!</p>
-                    )}
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Enter new list name"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddToList(e.target.value);
-                        setShowListModal(false);
-                      }
-                    }}
-                  />
-                  <button className={styles.closeBtn} onClick={() => setShowListModal(false)}>Cancel</button>
-                </div>
-              </div>
-            )}
-            <p><strong>Release Date:</strong> {formatDate(movie.release_date)}</p>
-            <p><strong>Director:</strong> {movie.director}</p>
-            <p className={styles.overview}>{movie.overview}</p>
           </div>
+
+          {/* List Modal */}
+          {showListModal && (
+            <div className={styles.listModal}>
+              <div className={styles.modalContent}>
+                <h3>Add to List</h3>
+
+                {/* Display existing lists */}
+                <div className={styles.existingLists}>
+                  {existingLists.length > 0 ? (
+                    <ul>
+                      {existingLists.map((list) => (
+                        <li key={list.list_id}>
+                          <button onClick={() => handleAddToExistingList(list.list_id)}>
+                            {list.list_name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No lists available. Create a new one!</p>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Enter new list name"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleAddToList(e.target.value);
+                      setShowListModal(false);
+                    }
+                  }}
+                />
+                <button className={styles.closeBtn} onClick={() => setShowListModal(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <p className={styles.overview}>{movie.overview}</p>
+          <hr></hr>
+          <h3>Cast</h3>
+          {movie.actors.length > 0 ? (
+            <div className={styles.castContainer}>
+              {movie.actors.map((actor, index) => (
+                <div key={index} className={styles.actorCard}>
+                  <img
+                    className={styles.actorProfile}
+                    src={actor.profile_url || "/user.jpg"}
+                    alt={actor.actor_name}
+                  />
+                  <h4>{actor.actor_name}</h4>
+                  <p>as {actor.character}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No cast available for this movie...</p>
+          )}
+        </div>
       </main>
     </div>
   );
+
 };
 
 export default MovieDetails;

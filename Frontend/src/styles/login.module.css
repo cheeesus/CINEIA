@@ -18,7 +18,6 @@
 .title {
     font-size: 4rem;
     font-weight: bold;
-    font-family: var(--font-geist-mono);
     padding: 3rem 1rem;
 }
 .form{

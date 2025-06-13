@@ -1,0 +1,34 @@
+
+.searchResultsContainer {
+display: flex;
+flex-wrap: wrap;
+padding: 10px 0;
+}
+
+
+.movieItem {
+    width: 200px; 
+    margin: 10px 10px;
+}
+
+.moviePoster {
+width: 200px; 
+height: 300px; 
+border-radius: 8px;
+object-fit: cover; 
+}
+.movieItem h3 {
+font-size: medium;
+}
+.movieItem span {
+font-size: small;
+}
+
+.info {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+.info span {
+    padding: auto;
+}

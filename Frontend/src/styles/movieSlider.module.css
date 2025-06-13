@@ -17,6 +17,7 @@ scrollbar-width: none;
 padding: 10px 0;
 }
 
+
 .movieItem {
 min-width: 200px; 
 }
@@ -34,33 +35,42 @@ font-size: medium;
 font-size: small;
 }
 
-
+.info {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+.info span {
+    padding: auto;
+}
 .scrollBtnLeft {
-left: 10px;
-position: absolute;
-top: 50%;
-transform: translateY(-50%);
-background: rgba(0, 0, 0, 0.5);
-color: white;
-padding: 10px;
-font-size: 24px;
-border: none;
-cursor: pointer;
-z-index: 1;
+    left: 10px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    background-color: transparent;
+    padding: 10px;
+    font-size: 30px;
+    border: none;
+    cursor: pointer;
+    z-index: 1;
+    border-radius: 50%;
 }
 
 .scrollBtnRight {
-right: 10px;
-position: absolute;
-top: 50%;
-transform: translateY(-50%);
-background: rgba(0, 0, 0, 0.5);
-color: white;
-padding: 10px;
-font-size: 24px;
-border: none;
-cursor: pointer;
-z-index: 1;
+    right: 10px;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: transparent;
+    color: white;
+    padding: 10px;
+    font-size: 30px;
+    border: none;
+    cursor: pointer;
+    z-index: 1;
+    border-radius: 50%;
 }
 
 .loadMoreBtn {

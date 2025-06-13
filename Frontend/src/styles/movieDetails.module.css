@@ -2,18 +2,23 @@
     width: 70%;
     margin: auto;
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
 }
 
-.moviePoster {
-    width: 300px;
-    margin: 10px;
+.posterImage {
+    
+    display: block; /* Prevents inline spacing issues */
+    margin: 0 auto; /* Centers the image horizontally */
+    border-radius: 8px; /* Optional: rounded corners for aesthetics */
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Optional: shadow for a nice effect */
 }
 .details {
-    padding-left: 10px;
+    padding: 30px 0;
+    
 }
 .overview {
     padding-top: 10px;
+    padding-bottom: 2em;
 }
 .details h1 {
     padding: 10px;
@@ -36,6 +41,8 @@
     background: none;
     border: none;
     cursor: pointer;
+    text-align: center;
+    height: 24px;
 }
 
 .listModal {
@@ -91,4 +98,40 @@
     background-color: brown;
     border: none;
     border-radius: 3px;
+}
+
+.castContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px; /* Ajout d'un espace entre les éléments */
+    justify-content: center;
+    padding: 16px; /* Ajout d'un padding pour un meilleur espacement */
+}
+
+.actorCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centrage du contenu */
+    text-align: center;
+    color: #f9f9f9; 
+    padding: 8px; /* Espacement interne */
+}
+
+.container h3 {
+    margin-top: 1em;
+}
+
+.actorCard h4, .actorCard p {
+    font-size: 0.9rem; 
+    margin: 4px 0; 
+
+}
+
+.actorProfile {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%; /* Cercle parfait */
+    object-fit: cover; /* Assure que l'image remplit son conteneur tout en conservant ses proportions */
+    margin-bottom: 8px; /* Espacement entre l'image et le texte */
+    border: 2px solid #1d1616; /* Légère bordure */
 }

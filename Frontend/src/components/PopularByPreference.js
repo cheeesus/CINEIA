@@ -75,19 +75,19 @@ const PopularMoviesByPreference = () => {
       {Object.entries(popularMovies).map(([genre, movies]) => (
         <div key={genre} className={styles.movieSliderContainer}>
           <h2>{genre}</h2>
-          <button className={styles.scrollBtnLeft} onClick={scrollLeft}>←</button>
+          <button className={styles.scrollBtnLeft} onClick={scrollLeft}>&#60;</button>
           <div className={styles.movieSlider} ref={sliderRef}>
             {movies.map((movie) => (
               <div key={movie.movie_id} className={styles.movieItem} onClick={() => handleMovieClick(movie.movie_id)}>
                 <Link href={`/movies/${movie.movie_id}`}>
                     <img src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} alt={movie.title} className={styles.moviePoster} />
                     <h3>{movie.title}</h3>
-                    <p>Release Date: {new Date(movie.release_date).toLocaleDateString()}</p>
+                    <p>{new Date(movie.release_date).toLocaleDateString()}</p>
                 </Link>
               </div>
             ))}
           </div>
-          <button className={styles.scrollBtnRight} onClick={scrollRight}>→</button>
+          <button className={styles.scrollBtnRight} onClick={scrollRight}>&#62;</button>
         </div>
       ))}
     </div>
