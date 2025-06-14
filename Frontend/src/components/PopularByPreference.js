@@ -62,6 +62,16 @@ const PopularMoviesByPreference = () => {
     }
   };
 
+  // Function to format the date
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
+
   if (loading) {
     return <p>Loading popular movies...</p>;
   }
@@ -81,8 +91,13 @@ const PopularMoviesByPreference = () => {
               <div key={movie.movie_id} className={styles.movieItem} onClick={() => handleMovieClick(movie.movie_id)}>
                 <Link href={`/movies/${movie.movie_id}`}>
                     <img src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} alt={movie.title} className={styles.moviePoster} />
-                    <h3>{movie.title}</h3>
-                    <p>{new Date(movie.release_date).toLocaleDateString()}</p>
+                    <div className={styles.info}>
+                      <div>
+                        <h3>{movie.title}</h3>
+                        <span>{formatDate(movie.release_date)}</span>
+                      </div>
+                      <span>{movie.rating}</span>
+                    </div>
                 </Link>
               </div>
             ))}

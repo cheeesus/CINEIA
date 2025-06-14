@@ -13,6 +13,8 @@ const MovieDetails = ({params}) => {
   const [movie, setMovie] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [rating, setRating] = useState(0);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
   const [showListModal, setShowListModal] = useState(false);
   const [existingLists, setExistingLists] = useState([]); // List of user's lists
 
@@ -46,8 +48,6 @@ const MovieDetails = ({params}) => {
       }
       const data = await response.json();
       setMovie(data);
-      console.log(data.user_rating);
-      setRating(data.user_rating || 0); // Default to 0 if user_rating is not available
     } catch (err) {
       console.error(err);
     }
@@ -80,6 +80,22 @@ const MovieDetails = ({params}) => {
     fetchLists();
   }, [user]); // Runs only once on mount
 
+
+
+  // Fetch comments
+  /*useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        const response = await axios.get(`http://127.0.0.1:5000/api/movies/${movieId}/comments`);
+        setComments(response.data);
+      } catch (error) {
+        console.error("Failed to fetch comments:", error);
+      }
+    };
+
+    if (movieId) fetchComments();
+  }, [movieId]);*/
+
   useEffect(() => {
     const fetchFavoriteStatus = async () => {
       if (!user || !user.userId) {
@@ -109,9 +125,24 @@ const MovieDetails = ({params}) => {
         console.error("Failed to fetch favorite status:", error);
       }
     };
+    const fetchUserRating = async () => {
+      if (!isLoggedIn || !movieId || !user?.userId) return;
+
+      try {
+        const response = await axios.get(`http://127.0.0.1:5000/api/movies/${movieId}/rating`, {
+          headers: { Authorization: `Bearer ${user?.token}` },
+        });
+        if (response.status === 200) {
+          setRating(response.data.user_rating || 0); // Set user rating
+        }
+      } catch (error) {
+        console.error("Failed to fetch user rating:", error);
+      }
+    };
 
     if (isLoggedIn && movieId) {
       fetchFavoriteStatus();
+      fetchUserRating();
     }
   }, [isLoggedIn, movieId, user]);
 
@@ -165,8 +196,11 @@ const MovieDetails = ({params}) => {
       );
 
       if (response.status === 200) {
-        setRating(newRating * 2); // Update local rating state
-        alert("Your rating has been submitted!");
+        setRating(newRating * 2);
+        const confirmComment = confirm("Would you like to leave a comment about this movie?");
+        if (confirmComment) {
+          document.getElementById("commentInput").focus();
+        }
       } else {
         console.error("Unexpected response:", response);
         alert("Failed to submit rating.");
@@ -174,6 +208,35 @@ const MovieDetails = ({params}) => {
     } catch (error) {
       console.error("Failed to submit rating:", error);
       alert("An error occurred. Please try again.");
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!isLoggedIn) {
+      alert("You need to be logged in to comment.");
+      return;
+    }
+
+    if (!newComment.trim()) {
+      alert("Comment cannot be empty.");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:5000/api/movies/${movieId}/comments`,
+        { comment: newComment },
+        { headers: { Authorization: `Bearer ${user?.token}` } }
+      );
+
+      if (response.status === 201) {
+        setComments((prev) => [...prev, response.data]);
+        setNewComment("");
+        alert("Comment added!");
+      }
+    } catch (error) {
+      console.error("Failed to submit comment:", error);
+      alert("Failed to submit comment. Please try again.");
     }
   };
 
@@ -351,6 +414,34 @@ const MovieDetails = ({params}) => {
           ) : (
             <p>No cast available for this movie...</p>
           )}
+          <hr></hr>
+          {/* Comment Section */}
+          <div className={styles.commentSection}>
+            <h3>Comments</h3>
+            {comments.length > 0 ? (
+              <ul>
+                {comments.map((comment, index) => (
+                  <li key={index} className={styles.comment}>
+                    <strong>{comment.username}</strong>: {comment.text}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <>
+                <p>No comments yet. Be the first to comment!</p>
+                <br></br>
+              </>
+            )}
+            <div className={styles.commentForm}>
+              <textarea
+                id="commentInput"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Write your comment here..."
+              />
+              <button onClick={handleSubmitComment}>Submit Comment</button>
+            </div>
+          </div>
         </div>
       </main>
     </div>
