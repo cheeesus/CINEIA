@@ -9,7 +9,7 @@ const PopularMoviesByPreference = () => {
   const { user, isLoggedIn } = useContext(UserContext);
   const [popularMovies, setPopularMovies] = useState({});
   const [loading, setLoading] = useState(true);
-  const sliderRef = useRef(null);
+  const sliderRefs = useRef({});
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
@@ -48,17 +48,15 @@ const PopularMoviesByPreference = () => {
     }
   };
 
-  // Scroll the slider left
-  const scrollLeft = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+  const scrollLeft = (genre) => {
+    if (sliderRefs.current[genre]) {
+      sliderRefs.current[genre].scrollBy({ left: -300, behavior: 'smooth' });
     }
   };
 
-  // Scroll the slider right
-  const scrollRight = () => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+  const scrollRight = (genre) => {
+    if (sliderRefs.current[genre]) {
+      sliderRefs.current[genre].scrollBy({ left: 300, behavior: 'smooth' });
     }
   };
 
@@ -85,24 +83,27 @@ const PopularMoviesByPreference = () => {
       {Object.entries(popularMovies).map(([genre, movies]) => (
         <div key={genre} className={styles.movieSliderContainer}>
           <h2>{genre}</h2>
-          <button className={styles.scrollBtnLeft} onClick={scrollLeft}>&#60;</button>
-          <div className={styles.movieSlider} ref={sliderRef}>
+          <button className={styles.scrollBtnLeft} onClick={() => scrollLeft(genre)}>&#60;</button>
+          <div
+            className={styles.movieSlider}
+            ref={(el) => (sliderRefs.current[genre] = el)}
+          >
             {movies.map((movie) => (
               <div key={movie.movie_id} className={styles.movieItem} onClick={() => handleMovieClick(movie.movie_id)}>
                 <Link href={`/movies/${movie.movie_id}`}>
-                    <img src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} alt={movie.title} className={styles.moviePoster} />
-                    <div className={styles.info}>
-                      <div>
-                        <h3>{movie.title}</h3>
-                        <span>{formatDate(movie.release_date)}</span>
-                      </div>
-                      <span>{movie.rating}</span>
+                  <img src={movie.poster_url || "https://via.placeholder.com/400x600?text=No+Image+Available"} alt={movie.title} className={styles.moviePoster} />
+                  <div className={styles.info}>
+                    <div>
+                      <h3>{movie.title}</h3>
+                      <span>{formatDate(movie.release_date)}</span>
                     </div>
+                    <span>{movie.rating}</span>
+                  </div>
                 </Link>
               </div>
             ))}
           </div>
-          <button className={styles.scrollBtnRight} onClick={scrollRight}>&#62;</button>
+          <button className={styles.scrollBtnRight} onClick={() => scrollRight(genre)}>&#62;</button>
         </div>
       ))}
     </div>
