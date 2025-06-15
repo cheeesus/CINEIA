@@ -7,7 +7,7 @@ import { UserContext } from "@/context/UserContext";
 import { FaTrash, FaTimes } from "react-icons/fa";
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const ListsDetails = () => {
   const { user, isLoggedIn } = useContext(UserContext);

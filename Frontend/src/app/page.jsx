@@ -9,6 +9,7 @@ import { UserContext } from "@/context/UserContext";
 
 export default function Home() {
   const { user, isLoggedIn } = useContext(UserContext);
+
   return (
     <div>
       <Header />

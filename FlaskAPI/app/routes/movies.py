@@ -424,115 +424,148 @@ def delete_movie_from_list(list_id: int, movie_id: int):
     
 
 
-# GET: Fetch all comments for a specific movie
 @movies_bp.route('/<int:movie_id>/comments', methods=['GET'])
 def get_comments(movie_id: int):
     with g.db.cursor() as cursor:
-        cursor.execute("""SELECT comment FROM comments WHERE movie_id = %s""", (movie_id,));
+        # Fetch email directly from the database
+        cursor.execute("""
+            SELECT 
+                ur.movie_id, 
+                ur.user_id, 
+                ur.rate_date, 
+                ur.comment, 
+                u.email, 
+                u.age
+            FROM 
+                users_ratings ur
+            JOIN 
+                users u
+            ON 
+                ur.user_id = u.id
+            WHERE 
+                ur.movie_id = %s AND ur.comment IS NOT NULL
+        """, (movie_id,))
         comments = cursor.fetchall()
+
     if not comments:
         return jsonify({"message": "No comments found for this movie."}), 404
 
-    return jsonify([
-        {
-            "id": comment.id,
-            "movie_id": comment.movie_id,
-            "user_id": comment.user_id,
-            "username": comment.username,
-            "content": comment.content,
-            "rating": comment.rating,
-            "created_at": comment.created_at,
-            "updated_at": comment.updated_at,
-        }
-        for comment in comments
-    ]), 200
+    # Process the data to derive usernames in Python
+    processed_comments = []
+    for comment in comments:
+        print(comment)  # For debugging
+        username = comment[4].split('@')[0]  # Derive username from email
+        processed_comments.append({
+            "movie_id": comment[0],
+            "user_id": comment[1],
+            "comment": comment[3],
+            "rating": None,  # Assuming 'rating' is missing in your query
+            "created_at": comment[2],
+            "username": username,
+            "age": comment[5]
+        })
 
-# POST: Add a new comment to a movie
+    return jsonify(processed_comments), 200
+
+
 @movies_bp.route('/<int:movie_id>/comments', methods=['POST'])
 @token_required
 def add_comment(movie_id: int):
     user_id = g.user['user_id']
     data = request.get_json()
-
-    if not data or not data.get("content") or not data.get("rating"):
-        return jsonify({"error": "Content and rating are required"}), 400
-
-    with g.db.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO comments (movie_id, user_id, username, content, rating, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-            RETURNING id, movie_id, user_id, username, content, rating, created_at, updated_at
-        """, (movie_id, user_id, data.get("username"), data["content"], data["rating"]))
-        new_comment = cursor.fetchone()
-
-    return jsonify({
-        "id": new_comment.id,
-        "movie_id": new_comment.movie_id,
-        "user_id": new_comment.user_id,
-        "username": new_comment.username,
-        "content": new_comment.content,
-        "rating": new_comment.rating,
-        "created_at": new_comment.created_at,
-        "updated_at": new_comment.updated_at
-    }), 201
-
-# PUT: Update a comment
-@movies_bp.route('/<int:movie_id>/comments/<int:comment_id>', methods=['PUT'])
-@token_required
-def update_comment(movie_id: int, comment_id: int):
-    user_id = g.user['user_id']
-    data = request.get_json()
-
-    if not data or not data.get("content") or not data.get("rating"):
-        return jsonify({"error": "Updated content and rating are required"}), 400
+    username = data.get("username")
+    
+    # Validate input
+    if not data or not data.get("comment"):
+        return jsonify({"error": "Comment is required"}), 400
 
     with g.db.cursor() as cursor:
-        # Verify that the comment exists and belongs to the current user
+        # Check if the user has already rated the movie
         cursor.execute("""
-            SELECT id FROM comments WHERE id = %s AND movie_id = %s AND user_id = %s
-        """, (comment_id, movie_id, user_id))
-        comment = cursor.fetchone()
+            SELECT rating FROM users_ratings 
+            WHERE user_id = %s AND movie_id = %s
+        """, (user_id, movie_id))
+        existing_rating = cursor.fetchone()
 
-        if not comment:
-            return jsonify({"error": "Comment not found or unauthorized"}), 404
+        if not existing_rating:
+            return jsonify({"error": "You need to rate the movie before commenting"}), 400
 
-        # Update the comment
+        # Update the comment for the existing rating
         cursor.execute("""
-            UPDATE comments
-            SET content = %s, rating = %s, updated_at = NOW()
-            WHERE id = %s
-            RETURNING id, movie_id, user_id, username, content, rating, created_at, updated_at
-        """, (data["content"], data["rating"], comment_id))
+            UPDATE users_ratings
+            SET comment = %s, rate_date = NOW()
+            WHERE user_id = %s AND movie_id = %s
+            RETURNING movie_id, user_id, comment, rating, rate_date
+        """, (data["comment"], user_id, movie_id))
         updated_comment = cursor.fetchone()
-
+    g.db.commit()
     return jsonify({
-        "id": updated_comment.id,
-        "movie_id": updated_comment.movie_id,
-        "user_id": updated_comment.user_id,
-        "username": updated_comment.username,
-        "content": updated_comment.content,
-        "rating": updated_comment.rating,
-        "created_at": updated_comment.created_at,
-        "updated_at": updated_comment.updated_at
+        "movie_id": updated_comment[0],
+        "user_id": updated_comment[1],
+        "username": username,
+        "comment": updated_comment[2],
+        "rating": updated_comment[3],
+        "updated_at": updated_comment[4]
     }), 200
 
-# DELETE: Remove a comment
-@movies_bp.route('/<int:movie_id>/comments/<int:comment_id>', methods=['DELETE'])
-@token_required
-def delete_comment(movie_id: int, comment_id: int):
-    user_id = g.user['user_id']
 
-    with g.db.cursor() as cursor:
-        # Verify that the comment exists and belongs to the current user
-        cursor.execute("""
-            SELECT id FROM comments WHERE id = %s AND movie_id = %s AND user_id = %s
-        """, (comment_id, movie_id, user_id))
-        comment = cursor.fetchone()
+# PUT: Update a comment
+# @movies_bp.route('/<int:movie_id>/comments/<int:comment_id>', methods=['PUT'])
+# @token_required
+# def update_comment(movie_id: int, comment_id: int):
+#     user_id = g.user['user_id']
+#     data = request.get_json()
 
-        if not comment:
-            return jsonify({"error": "Comment not found or unauthorized"}), 404
+#     if not data or not data.get("content") or not data.get("rating"):
+#         return jsonify({"error": "Updated content and rating are required"}), 400
 
-        # Delete the comment
-        cursor.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
+#     with g.db.cursor() as cursor:
+#         # Verify that the comment exists and belongs to the current user
+#         cursor.execute("""
+#             SELECT id FROM comments WHERE id = %s AND movie_id = %s AND user_id = %s
+#         """, (comment_id, movie_id, user_id))
+#         comment = cursor.fetchone()
 
-    return jsonify({"message": "Comment deleted successfully"}), 200
+#         if not comment:
+#             return jsonify({"error": "Comment not found or unauthorized"}), 404
+
+#         # Update the comment
+#         cursor.execute("""
+#             UPDATE comments
+#             SET content = %s, rating = %s, updated_at = NOW()
+#             WHERE id = %s
+#             RETURNING id, movie_id, user_id, username, content, rating, created_at, updated_at
+#         """, (data["content"], data["rating"], comment_id))
+#         updated_comment = cursor.fetchone()
+
+#     return jsonify({
+#         "id": updated_comment.id,
+#         "movie_id": updated_comment.movie_id,
+#         "user_id": updated_comment.user_id,
+#         "username": updated_comment.username,
+#         "content": updated_comment.content,
+#         "rating": updated_comment.rating,
+#         "created_at": updated_comment.created_at,
+#         "updated_at": updated_comment.updated_at
+#     }), 200
+
+# # DELETE: Remove a comment
+# @movies_bp.route('/<int:movie_id>/comments/<int:comment_id>', methods=['DELETE'])
+# @token_required
+# def delete_comment(movie_id: int, comment_id: int):
+#     user_id = g.user['user_id']
+
+#     with g.db.cursor() as cursor:
+#         # Verify that the comment exists and belongs to the current user
+#         cursor.execute("""
+#             SELECT id FROM comments WHERE id = %s AND movie_id = %s AND user_id = %s
+#         """, (comment_id, movie_id, user_id))
+#         comment = cursor.fetchone()
+
+#         if not comment:
+#             return jsonify({"error": "Comment not found or unauthorized"}), 404
+
+#         # Delete the comment
+#         cursor.execute("DELETE FROM comments WHERE id = %s", (comment_id,))
+
+#     return jsonify({"message": "Comment deleted successfully"}), 200

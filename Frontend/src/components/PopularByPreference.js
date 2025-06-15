@@ -6,7 +6,7 @@ import { UserContext } from '@/context/UserContext';
 import styles from '@/styles/PopularMovies.module.css';
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const PopularMoviesByPreference = () => {
   const { user, isLoggedIn } = useContext(UserContext);

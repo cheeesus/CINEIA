@@ -4,7 +4,7 @@ import Cookies from "js-cookie";
 import {jwtDecode} from "jwt-decode"; // Install via npm: npm install jwt-decode
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Register user
 export const registerUser = async (email, password, age, selectedGenres) => {

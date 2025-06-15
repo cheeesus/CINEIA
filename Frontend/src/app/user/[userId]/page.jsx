@@ -12,7 +12,7 @@ const allGenres = [
 ];
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const UserProfile = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);

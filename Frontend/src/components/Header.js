@@ -18,7 +18,7 @@ export default function Header() {
   const dropdownRef = useRef(null);
 
   // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     const fetchSearchResults = async () => {

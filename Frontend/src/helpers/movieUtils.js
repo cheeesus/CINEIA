@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const recordMovieView = async (userId, movieId, token) => {
   try {

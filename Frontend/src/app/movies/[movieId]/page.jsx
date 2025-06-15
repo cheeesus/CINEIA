@@ -8,7 +8,7 @@ import styles from "@/styles/movieDetails.module.css";
 import { UserContext } from "@/context/UserContext";
 
 // Load environment variables
-const API_URL = process.env.API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const MovieDetails = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);
@@ -86,10 +86,10 @@ const MovieDetails = ({params}) => {
 
 
   // Fetch comments
-  /*useEffect(() => {
+  useEffect(() => {
     const fetchComments = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:5000/api/movies/${movieId}/comments`);
+        const response = await axios.get(`${API_URL}/movies/${movieId}/comments`);
         setComments(response.data);
       } catch (error) {
         console.error("Failed to fetch comments:", error);
@@ -97,7 +97,7 @@ const MovieDetails = ({params}) => {
     };
 
     if (movieId) fetchComments();
-  }, [movieId]);*/
+  }, [movieId]);
 
   useEffect(() => {
     const fetchFavoriteStatus = async () => {
@@ -215,33 +215,37 @@ const MovieDetails = ({params}) => {
   };
 
   const handleSubmitComment = async () => {
-    if (!isLoggedIn) {
-      alert("You need to be logged in to comment.");
-      return;
-    }
+  if (!isLoggedIn) {
+    alert("You need to be logged in to comment.");
+    return;
+  }
 
-    if (!newComment.trim()) {
-      alert("Comment cannot be empty.");
-      return;
-    }
+  if (!newComment.trim()) {
+    alert("Comment cannot be empty.");
+    return;
+  }
 
-    try {
-      const response = await axios.post(
-        `${API_URL}/movies/${movieId}/comments`,
-        { comment: newComment },
-        { headers: { Authorization: `Bearer ${user?.token}` } }
-      );
+  try {
+    const response = await axios.post(
+      `${API_URL}/movies/${movieId}/comments`,
+      { 
+        comment: newComment, 
+        username: user?.username || "" 
+      },
+      { headers: { Authorization: `Bearer ${user?.token}` } }
+    );
 
-      if (response.status === 201) {
-        setComments((prev) => [...prev, response.data]);
-        setNewComment("");
-        alert("Comment added!");
-      }
-    } catch (error) {
-      console.error("Failed to submit comment:", error);
-      alert("Failed to submit comment. Please try again.");
+    if (response.status === 200) {
+      setComments((prev) => [...prev, response.data]);
+      setNewComment("");
+      alert("Comment added!");
     }
-  };
+  } catch (error) {
+    console.error("Failed to submit comment:", error);
+    alert("Failed to submit comment. Please try again.");
+  }
+};
+
 
   // Handle adding to an existing list
   const handleAddToExistingList = async (listId) => {
@@ -425,7 +429,7 @@ const MovieDetails = ({params}) => {
               <ul>
                 {comments.map((comment, index) => (
                   <li key={index} className={styles.comment}>
-                    <strong>{comment.username}</strong>: {comment.text}
+                    <strong>{comment.username}</strong>: {comment.comment}
                   </li>
                 ))}
               </ul>
