@@ -7,6 +7,9 @@ import Header from "@/components/Header";
 import styles from "@/styles/movieDetails.module.css";
 import { UserContext } from "@/context/UserContext";
 
+// Load environment variables
+const API_URL = process.env.API_URL;
+
 const MovieDetails = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);
   const [movieId, setMovieId] = useState(null);
@@ -40,7 +43,7 @@ const MovieDetails = ({params}) => {
   useEffect(() => {
   const fetchMovie = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/movies/${movieId}`, {
+      const response = await fetch(`${API_URL}/movies/${movieId}`, {
         headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
       });
       if (!response.ok) {
@@ -67,7 +70,7 @@ const MovieDetails = ({params}) => {
       }
 
       try {
-        const response = await axios.get(`http://127.0.0.1:5000/api/users/${user.userId}/lists`, {
+        const response = await axios.get(`${API_URL}/users/${user.userId}/lists`, {
           headers: { Authorization: `Bearer ${user?.token}` },
         });
         console.log(response.data);
@@ -104,7 +107,7 @@ const MovieDetails = ({params}) => {
       }
       try {
         const response = await axios.get(
-          `http://127.0.0.1:5000/api/users/${user.userId}/lists`, // Endpoint to fetch lists
+          `${API_URL}/users/${user.userId}/lists`, // Endpoint to fetch lists
           { headers: { Authorization: `Bearer ${user?.token}` } }
         );
         
@@ -114,7 +117,7 @@ const MovieDetails = ({params}) => {
         if (favoritesList) {
           // Fetch movies in the "Favorites" list
           const response = await axios.get(
-            `http://127.0.0.1:5000/api/movies/${favoritesList['list_id']}/movies`,
+            `${API_URL}/movies/${favoritesList['list_id']}/movies`,
             { headers: { Authorization: `Bearer ${user?.token}` } }
           );
           const moviesInFavorites = response.data['movie_ids'];
@@ -129,7 +132,7 @@ const MovieDetails = ({params}) => {
       if (!isLoggedIn || !movieId || !user?.userId) return;
 
       try {
-        const response = await axios.get(`http://127.0.0.1:5000/api/movies/${movieId}/rating`, {
+        const response = await axios.get(`${API_URL}/movies/${movieId}/rating`, {
           headers: { Authorization: `Bearer ${user?.token}` },
         });
         if (response.status === 200) {
@@ -156,7 +159,7 @@ const MovieDetails = ({params}) => {
       if (isFavorite) {
         // Remove from favorites
         await axios.delete(
-          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`,
+          `${API_URL}/movies/${movieId}/favorite`,
           {
             headers: { Authorization: `Bearer ${user?.token}` },
           }
@@ -165,7 +168,7 @@ const MovieDetails = ({params}) => {
       } else {
         // Add to favorites
         await axios.post(
-          `http://127.0.0.1:5000/api/movies/${movieId}/favorite`,
+          `${API_URL}/movies/${movieId}/favorite`,
           {},
           {
             headers: { Authorization: `Bearer ${user?.token}` },
@@ -190,7 +193,7 @@ const MovieDetails = ({params}) => {
 
     try {
       const response = await axios.post(
-        `http://127.0.0.1:5000/api/movies/${movieId}/rate`,
+        `${API_URL}/movies/${movieId}/rate`,
         { movie_id: movieId, rating: newRating * 2 },
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );
@@ -224,7 +227,7 @@ const MovieDetails = ({params}) => {
 
     try {
       const response = await axios.post(
-        `http://127.0.0.1:5000/api/movies/${movieId}/comments`,
+        `${API_URL}/movies/${movieId}/comments`,
         { comment: newComment },
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );
@@ -244,7 +247,7 @@ const MovieDetails = ({params}) => {
   const handleAddToExistingList = async (listId) => {
     try {
         const response = await axios.post(
-            `http://127.0.0.1:5000/api/users/${user.userId}/${listId}/add`,
+            `${API_URL}/users/${user.userId}/${listId}/add`,
             { movieId },
             { headers: { Authorization: `Bearer ${user?.token}` } }
         );
@@ -281,7 +284,7 @@ const MovieDetails = ({params}) => {
     }
 
     try {
-      const response = await axios.post(`http://127.0.0.1:5000/api/movies/${movieId}/add-to-list`, 
+      const response = await axios.post(`${API_URL}/movies/${movieId}/add-to-list`, 
         { movie_id: movieId, list_name: listName },
         { headers: { Authorization: `Bearer ${user?.token}` } });
       setExistingLists((prev) => [...prev, response.data]); // Add new list to state

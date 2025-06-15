@@ -1,9 +1,12 @@
 import axios from "axios";
 
+// Load environment variables
+const API_URL = process.env.API_URL;
+
 export const recordMovieView = async (userId, movieId, token) => {
   try {
     await axios.post(
-      `http://127.0.0.1:5000/api/movies/${userId}/history`,
+      `${API_URL}/movies/${userId}/history`,
       { movie_id: movieId },
       { headers: { Authorization: `Bearer ${token}` } }
     );

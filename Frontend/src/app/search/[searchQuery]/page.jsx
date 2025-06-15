@@ -6,6 +6,8 @@ import Header from "@/components/Header";
 import Link from "next/link"; 
 import axios from "axios"; 
 
+// Load environment variables
+const API_URL = process.env.API_URL;
 
 const SearchPage = ({ params }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,7 +44,7 @@ const SearchPage = ({ params }) => {
       }
 
       try {
-        const response = await axios.get("http://127.0.0.1:5000/api/movies/search", {
+        const response = await axios.get(`${API_URL}/movies/search`, {
           params: { query: searchQuery },
         });
 
@@ -83,7 +85,7 @@ const SearchPage = ({ params }) => {
 
     try {
       await axios.post(
-        `http://127.0.0.1:5000/api/movies/${user.userId}/history`,
+        `${API_URL}/movies/${user.userId}/history`,
         { movie_id: movieId },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );

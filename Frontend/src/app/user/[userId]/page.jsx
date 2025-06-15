@@ -11,6 +11,9 @@ const allGenres = [
   "Animation", "Family", "History", "TV Movie", "Music", "Documentary"
 ];
 
+// Load environment variables
+const API_URL = process.env.API_URL;
+
 const UserProfile = ({params}) => {
   const { user, isLoggedIn } = useContext(UserContext);
   const [userId, setUserId] = useState(null);
@@ -34,7 +37,7 @@ const UserProfile = ({params}) => {
         try {
           console.log(user.token);
           
-            const response = await axios.get(`http://127.0.0.1:5000/api/users/${userId}`, {
+            const response = await axios.get(`${API_URL}/users/${userId}`, {
                 headers: { Authorization: `Bearer ${user?.token}` },
             });
             setProfileData(response.data);
@@ -75,7 +78,7 @@ const UserProfile = ({params}) => {
     console.log(selectedGenres);
     try {
       await axios.put(
-        `http://127.0.0.1:5000/api/users/${userId}/genres`,
+        `${API_URL}/users/${userId}/genres`,
         { preferred_genres: selectedGenres },
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );

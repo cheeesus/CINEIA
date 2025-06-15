@@ -4,9 +4,7 @@ import { UserContext } from "@/context/UserContext";
 import { loginUser } from "../../helpers/auth";
 import { useRouter } from "next/navigation";
 import Link from 'next/link'
-
 import Header from "@/components/Header";
-
 import styles from "@/styles/login.module.css";
 
 export default function Login() {

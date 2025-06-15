@@ -192,8 +192,7 @@ def add_to_existing_list(user_id: int, list_id: int):
 def get_popular_movies_by_user_preferences(user_id: int):
     try:
         with g.db.cursor() as cursor:
-            # 1. Fetch user's preferred genre IDs and names
-            # Join user_preferences with the genres table to get the genre name
+            # Fetch user's preferred genre IDs and names
             cursor.execute("""
                 SELECT up.genre_id, g.name AS genre_name
                 FROM user_preferences up
@@ -205,13 +204,11 @@ def get_popular_movies_by_user_preferences(user_id: int):
             if not preferred_genres:
                 return jsonify({"message": "No preferred genres found for this user."}), 404
 
-            # 2. Fetch most popular movies for each preferred genre
+            # Fetch most popular movies for each preferred genre
             genre_movie_map = {}
             for genre_id, genre_name in preferred_genres:
-                # Assuming 'popularity' column exists in the 'movies' table
-                # If not, use m.release_date DESC or another metric
                 cursor.execute("""
-                    SELECT m.id, m.title, m.poster_path, m.release_date, m.popularity
+                    SELECT m.id, m.title, m.poster_path, m.release_date, m.vote_average, m.popularity
                     FROM movies m
                     JOIN movie_genre mg ON m.id = mg.movie_id
                     WHERE mg.genre_id = %s
@@ -220,14 +217,14 @@ def get_popular_movies_by_user_preferences(user_id: int):
                 """, (genre_id,))
                 movies = cursor.fetchall()
 
-                # Convert tuple results to dictionaries for better readability in JSON
+                # Convert tuple results to dictionaries 
                 genre_movie_map[genre_name] = [
                     {
                         "movie_id": movie[0],
                         "title": movie[1],
                         "poster_url": "https://image.tmdb.org/t/p/w500" + movie[2] if movie[2] else None,
                         "release_date": str(movie[3]), 
-                        "popularity": movie[4]
+                        "rating": movie[4]
                     }
                     for movie in movies
                 ]

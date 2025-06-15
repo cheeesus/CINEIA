@@ -3,6 +3,8 @@ import styles from "@/styles/movieSlider.module.css"
 import Link from "next/link"; 
 import axios from "axios"; 
 
+// Load environment variables
+const API_URL = process.env.API_URL;
 
 const TopRatedSlider = () => {
   const [TopMovies, setTopMovies] = useState([]);
@@ -14,7 +16,7 @@ const TopRatedSlider = () => {
   // Function to fetch recent movies with pagination
   const fetchTopMovies = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:5000/api/movies/top", {
+      const response = await axios.get(`${API_URL}/movies/top`, {
         params: {
           page: page,
           limit: 24,  // Limit the number of movies per request
@@ -75,7 +77,7 @@ const TopRatedSlider = () => {
 
     try {
       await axios.post(
-        `http://127.0.0.1:5000/api/movies/${user.userId}/history`,
+        `${API_URL}/movies/${user.userId}/history`,
         { movie_id: movieId },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );

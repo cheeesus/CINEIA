@@ -6,6 +6,9 @@ import styles from "@/styles/listsDetails.module.css";
 import { UserContext } from "@/context/UserContext";
 import { FaTrash, FaTimes } from "react-icons/fa";
 
+// Load environment variables
+const API_URL = process.env.API_URL;
+
 const ListsDetails = () => {
   const { user, isLoggedIn } = useContext(UserContext);
   const [existingLists, setExistingLists] = useState([]); // List of user's lists
@@ -21,7 +24,7 @@ const ListsDetails = () => {
         try {
         // Fetch lists
         const listsResponse = await axios.get(
-            `http://127.0.0.1:5000/api/users/${user.userId}/lists`,
+            `${API_URL}/users/${user.userId}/lists`,
             { headers: { Authorization: `Bearer ${user?.token}` } }
         );
 
@@ -33,7 +36,7 @@ const ListsDetails = () => {
             lists.map(async (list) => {
             try {
                 const moviesResponse = await axios.get(
-                `http://127.0.0.1:5000/api/movies/${list.list_id}/movies`,
+                `${API_URL}/movies/${list.list_id}/movies`,
                 { headers: { Authorization: `Bearer ${user?.token}` } }
                 );
 
@@ -44,7 +47,7 @@ const ListsDetails = () => {
                 movieIds.map(async (movieId) => {
                     try {
                     const movieDetailsResponse = await axios.get(
-                        `http://127.0.0.1:5000/api/movies/${movieId}`,
+                        `${API_URL}/movies/${movieId}`,
                         { headers: { Authorization: `Bearer ${user?.token}` } }
                     );
                     
@@ -82,7 +85,7 @@ const ListsDetails = () => {
 
     try {
       await axios.delete(
-        `http://127.0.0.1:5000/api/movies/${listId}`,
+        `${API_URL}/movies/${listId}`,
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );
 
@@ -101,7 +104,7 @@ const ListsDetails = () => {
 
     try {
       await axios.delete(
-        `http://127.0.0.1:5000/api/movies/${listId}/movies/${movieId}`,
+        `${API_URL}/movies/${listId}/movies/${movieId}`,
         { headers: { Authorization: `Bearer ${user?.token}` } }
       );
 

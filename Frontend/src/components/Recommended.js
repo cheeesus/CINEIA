@@ -4,6 +4,8 @@ import styles from "@/styles/movieSlider.module.css"
 import Link from "next/link"; 
 import axios from "axios"; 
 
+// Load environment variables
+const API_URL = process.env.API_URL;
 
 const RecommendedSlider = () => {
   const { user, isLoggedIn } = useContext(UserContext);
@@ -20,7 +22,7 @@ const RecommendedSlider = () => {
     try {
       setLoading(true);
       console.log(user.userId)
-      const response = await axios.get(`http://127.0.0.1:5000/api/movies/${user.userId}/recommend`, {
+      const response = await axios.get(`${API_URL}/movies/${user.userId}/recommend`, {
         params: {
           page: page,
           limit: 24,
@@ -81,7 +83,7 @@ const RecommendedSlider = () => {
 
       try {
         await axios.post(
-          `http://127.0.0.1:5000/api/movies/${user.userId}/history`,
+          `${API_URL}/movies/${user.userId}/history`,
           { movie_id: movieId },
           { headers: { Authorization: `Bearer ${user.token}` } }
         );

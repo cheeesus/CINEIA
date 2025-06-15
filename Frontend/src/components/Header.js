@@ -17,6 +17,9 @@ export default function Header() {
   const router = useRouter();
   const dropdownRef = useRef(null);
 
+  // Load environment variables
+const API_URL = process.env.API_URL;
+
   useEffect(() => {
     const fetchSearchResults = async () => {
       if (!searchQuery.trim()) {
@@ -24,10 +27,10 @@ export default function Header() {
         setShowDropdown(false);
         return;
       }
-
+      const formattedQuery = searchQuery.trim().replace(/\s+/g, '+'); // Replace spaces with +
       try {
-        const response = await axios.get("http://127.0.0.1:5000/api/movies/search", {
-          params: { query: searchQuery },
+        const response = await axios.get(`${API_URL}/movies/search`, {
+          params: { query: formattedQuery },
         });
 
         setSearchResults(response.data.movies);

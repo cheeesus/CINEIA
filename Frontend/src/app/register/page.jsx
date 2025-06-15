@@ -6,12 +6,12 @@ import { useRouter } from "next/navigation"; // Use next/navigation for routing 
 import styles from "@/styles/login.module.css";
 import Header from "@/components/Header";
 
-// Western, Drama, Action, Crime, Mystery, Thriller, Horror, Adventure, Science Fiction, Romance, Comedy, War, Fantasy, Animation, Family, History, TV Movie, Music, Documentary
 const genresList = [
   "Western", "Drama", "Action", "Crime", "Mystery", "Thriller", "Horror",
   "Adventure", "Science Fiction", "Romance", "Comedy", "War", "Fantasy",
   "Animation", "Family", "History", "TV Movie", "Music", "Documentary"
 ];
+
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

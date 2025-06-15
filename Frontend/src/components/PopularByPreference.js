@@ -5,6 +5,9 @@ import Link from "next/link";
 import { UserContext } from '@/context/UserContext';
 import styles from '@/styles/PopularMovies.module.css';
 
+// Load environment variables
+const API_URL = process.env.API_URL;
+
 const PopularMoviesByPreference = () => {
   const { user, isLoggedIn } = useContext(UserContext);
   const [popularMovies, setPopularMovies] = useState({});
@@ -16,10 +19,11 @@ const PopularMoviesByPreference = () => {
 
     const fetchPopularMovies = async () => {
       try {
-        const response = await axios.get(`http://127.0.0.1:5000/api/users/${user.userId}/popular-by-preference`, {
+        const response = await axios.get(`${API_URL}/users/${user.userId}/popular-by-preference`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setPopularMovies(response.data.popular_movies);
+
       } catch (error) {
         console.error('Error fetching popular movies:', error);
       } finally {
@@ -38,7 +42,7 @@ const PopularMoviesByPreference = () => {
 
     try {
       await axios.post(
-        `http://127.0.0.1:5000/api/movies/${user.userId}/history`,
+        `${API_URL}/movies/${user.userId}/history`,
         { movie_id: movieId },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
@@ -97,7 +101,6 @@ const PopularMoviesByPreference = () => {
                       <h3>{movie.title}</h3>
                       <span>{formatDate(movie.release_date)}</span>
                     </div>
-                    <span>{movie.rating}</span>
                   </div>
                 </Link>
               </div>
