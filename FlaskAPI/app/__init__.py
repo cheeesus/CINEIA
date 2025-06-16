@@ -10,7 +10,7 @@ def create_app():
     app.config.from_pyfile('config.py')
     
     # Enable CORS for all routes
-    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}}, supports_credentials=True)
+    CORS(app, resources={r"/api/*": {"origins": ["http://45.149.207.13:3100","http://localhost:3000", "http://127.0.0.1:3000"]}}, supports_credentials=True)
     # CORS(app, supports_credentials=True)
     # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
     
