@@ -20,20 +20,42 @@ from DNN_TorchFM_TTower.models.db import (
 )
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 
-def load_model(model_path: str = None, embedding_dim: int = 32) -> TwoTowerMLPModel:
+def load_model(model_path: str | None = None, *, embedding_dim: int = 32) -> TwoTowerMLPModel:
+    """加载 Two-Tower，并对“新用户 / 新电影”做安全扩容拷贝。"""
     if model_path is None:
-        current_dir = Path(__file__).resolve().parent
-        model_path = current_dir.parent.parent / 'saved_model' / 'dnn_recommender.pt'
+        model_path = Path(__file__).resolve().parents[3] / "saved_model" / "dnn_recommender.pt"
     model_path = Path(model_path)
-    if not model_path.exists():
-        raise FileNotFoundError(f"[two_tower] Model file {model_path} not found. Please train first.")
+
+    # ── 1. 取得最新 vocab size ──────────────────────────────────────────
     max_u = get_max_user_id()
     max_m = get_max_movie_id()
-    model = TwoTowerMLPModel(num_users=max_u, num_movies=max_m, embedding_dim=embedding_dim, hidden_dim=64)
-    state = torch.load(model_path, map_location=torch.device("cpu"))
+    model = TwoTowerMLPModel(max_u, max_m, embedding_dim=embedding_dim, hidden_dim=64)
+
+    # 如果还没有训练过，直接返回随机初始模型
+    if not model_path.exists():
+        return model.eval()
+
+    # ── 2. 断点权重加载（带扩容） ────────────────────────────────────────
+    state = torch.load(model_path, map_location="cpu")
+
+    # helper：把旧权重拷进新的 embedding，剩下的行保持随机初始化
+    def _copy(old_w, new_w):
+        rows = min(old_w.size(0), new_w.size(0))
+        new_w[:rows].data.copy_(old_w[:rows])
+
+    if "user_embedding.weight" in state:
+        _copy(state["user_embedding.weight"], model.user_embedding.weight)
+    if "movie_embedding.weight" in state:
+        _copy(state["movie_embedding.weight"], model.movie_embedding.weight)
+
+    # 其余层形状相同，直接加载（strict=False 跳过刚才处理过的两个 key）
+    for k in ["user_embedding.weight", "movie_embedding.weight"]:
+        state.pop(k, None)
     model.load_state_dict(state, strict=False)
+
     model.eval()
     return model
+
 
 def recommend_warm_start(model: TwoTowerMLPModel, user_id: int, top_n: int = 10) -> Tuple[List[int], List[float]]:
     tic = time.time()

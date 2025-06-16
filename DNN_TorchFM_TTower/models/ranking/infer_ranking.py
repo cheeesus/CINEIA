@@ -16,13 +16,38 @@ def _vocab_sizes():
     return [mu + 2, mm + 2, mg + 2]
 
 def _load_model(field_dims, num_dense):
-    m = DeepFM(field_dims, num_dense)
-    try:
-        m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"), strict=False)
-        m.eval()
-        return m
-    except FileNotFoundError:
+    """
+    按最新 vocab_size 重建 DeepFM，然后把旧模型已有行权重拷贝进来；
+    新增的行保持随机初始化，避免 size-mismatch 报错。
+    """
+    model = DeepFM(field_dims, num_dense)
+
+    # ① 没有历史模型直接返回随机初始
+    if not MODEL_PATH.exists():
         return None
+
+    # ② 读取旧断点
+    state_old = torch.load(MODEL_PATH, map_location="cpu")
+
+    # ③ helper：把旧权重按行拷进新的 embedding
+    def _safe_copy(param_name: str, new_weight):
+        if param_name in state_old:
+            old_weight = state_old[param_name]
+            rows = min(old_weight.size(0), new_weight.size(0))
+            new_weight[:rows].data.copy_(old_weight[:rows])
+
+    # 注意 param_name 要和 state_dict 的实际 key 完全一致
+    _safe_copy("linear_sparse.fc.weight",     model.linear_sparse.fc.weight)
+    _safe_copy("embedding.embedding.weight",  model.embedding.embedding.weight)
+
+    # 把已手动处理的 key 删掉，剩余部分 strict=False 加载
+    state_old.pop("linear_sparse.fc.weight",    None)
+    state_old.pop("embedding.embedding.weight", None)
+    model.load_state_dict(state_old, strict=False)
+
+    model.eval()
+    return model
+
 
 def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
     if not movie_ids:

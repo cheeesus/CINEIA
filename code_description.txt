@@ -1,0 +1,1595 @@
+目录结构（./DNN_TorchFM_TTower）
+├── models
+│   ├── __init__.py
+│   ├── config.py
+│   ├── db.py
+│   ├── pytorch_model.py
+│   ├── ranking
+│   │   ├── __init__.py
+│   │   ├── custom_deepfm.py
+│   │   ├── feature_engineer.py
+│   │   ├── infer_ranking.py
+│   │   ├── torchfm
+│   │   │   └── deepfm.py
+│   │   ├── torchfm_ranker.py
+│   │   └── train_ranking.py
+│   └── recall
+│       ├── __init__.py
+│       ├── cold_start.py
+│       ├── train_incremental.py
+│       ├── train_two_tower.py
+│       └── two_tower.py
+├── readme.md
+├── readyou_description_CN.md
+├── requirements.txt
+├── saved_model
+│   ├── deepfm_ranker.pt
+│   └── dnn_recommender.pt
+├── scripts
+│   ├── incremental.py
+│   └── interactive_demo.py
+└── service
+    ├── __init__.py
+    ├── recommender copy.py
+    └── recommender.py
+
+
+文件内容如下：
+
+===== 文件: ./DNN_TorchFM_TTower\readme.md =====
+# CINEIA – AI Back-End (Two-Tower Recall + DeepFM Re-Rank)
+
+This branch contains the complete Python code required to **train**, **serve** and **try** the recommendation engine that will later be queried by the front-end.
+
+###  Quick start
+
+```bash
+# 0  move into the project
+cd DNN_TorchFM_TTower
+
+# 1  install dependencies (CPU PyTorch by default)
+pip install --upgrade -r requirements.txt
+
+# 2  (optional) edit models/config.py to point to your PostgreSQL
+
+# 3  train / retrain the Two-Tower recall model
+python -m DNN_TorchFM_TTower.models.recall.train_two_tower  --epochs 3 --batch 128
+
+# 4  train / retrain the DeepFM re-rank model
+python -m DNN_TorchFM_TTower.models.ranking.train_ranking   --epochs 3
+
+# 5  run the interactive CLI demo (cold-start → warm-start → incremental retrain)
+python -m DNN_TorchFM_TTower.scripts.interactive_demo
+
+```
+
+### Project layout (high level)
+```bash
+models/
+│
+├─ config.py             ← DB credentials
+├─ db.py                 ← thin PostgreSQL helper
+├─ pytorch_model.py      ← Two-Tower network
+│
+├─ recall/               ← coarse recall layer
+│   ├─ cold_start.py
+│   ├─ two_tower.py      ← inference helper
+│   ├─ train_two_tower.py
+│   └─ train_incremental.py
+│
+└─ ranking/              ← fine re-rank layer
+    ├─ custom_deepfm.py  ← pure-PyTorch DeepFM
+    ├─ feature_engineer.py
+    ├─ train_ranking.py
+    └─ infer_ranking.py
+service/
+│   ├─ recommender.py    ← single python entry, returns Top-N ids
+│   └─ api.py (optional) ← FastAPI REST wrapper
+scripts/
+    └─ interactive_demo.py
+saved_model/             ← trained weights (auto-created)
+requirements.txt
+```
+
+### AI pipeline
+```bash
+new user
+   │ cold_start(pop-REC+diversity)
+   ▼
+movie ids ───────────────┐
+                         │
+old user                 ▼
+(view history) → Two-Tower recall (300 ids, score)
+                         │
+                         ▼
+                 DeepFM re-rank (uses recall_score + 3 dense feats)
+                         │
+                         ▼
+                    Top-N  personalised list
+```
+
+### Database quick reference
+-- inspect public schema
+```sql
+SELECT table_name   AS "Table",
+       column_name  AS "Column",
+       data_type    AS "Type",
+       is_nullable  AS "NULL?",
+       column_default AS "Default"
+FROM   information_schema.columns
+WHERE  table_schema = 'public'
+ORDER  BY table_name, ordinal_position;
+```
+
+===== 文件: ./DNN_TorchFM_TTower\readyou_description_CN.md =====
+## The Process of run the Demo Recommandation System
+> 05/01/2025
+
+## I recommand you to use the following steps to run the recommender system.
+## it's better to use the Conda env to run the recommender system.
+
+python -m venv rec_python10
+python activate rec_python10/scripts/activate
+
+# 1. install the requirment packages
+pip install --upgrade -r requirements.txt
+
+# 3. retrain the call back model 
+python -m models.recall.train_two_tower --epochs 3 --batch 128
+
+# 4. retraion the re-rank model
+python -m models.ranking.train_ranking --epochs 3
+
+# 5. check the recommendation results
+python -m service/recommender.py 1001 --top 10
+
+# exit the conda env
+deactivate
+
+### Backup code for checkout the database
+psql -h postgresql-yannr.alwaysdata.net -p 5432 -U yannr_01 -d yannr_00
+Project1234
+
+
+
+查看所有表的字段、数据类型、是否可空、默认值
+
+
+SELECT
+    table_name AS 表名,
+    column_name AS 字段名,
+    data_type AS 数据类型,
+    is_nullable AS 是否可空,
+    column_default AS 默认值
+FROM
+    information_schema.columns
+WHERE
+    table_schema = 'public'
+ORDER BY
+    table_name, ordinal_position;
+
+===== 文件: ./DNN_TorchFM_TTower\models\config.py =====
+# models/config.py
+DB_NAME = "yannr_00"
+DB_USER = "yannr_01"
+DB_PASSWORD = "Projet1234"
+DB_HOST = "postgresql-yannr.alwaysdata.net"
+DB_PORT = 5432
+
+
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\db.py =====
+# DNN_TorchFM_TTower\models\db.py
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from collections import Counter
+from DNN_TorchFM_TTower.models.config import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+
+def get_connection():
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+def fetchall_dict(query, params=None):
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            return cur.fetchall()
+
+def fetchone_dict(query, params=None):
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(query, params)
+            return cur.fetchone()
+
+def get_movie_titles(movie_ids):
+    query = "SELECT id, title FROM movies WHERE id = ANY(%s)"
+    rows = fetchall_dict(query, (movie_ids,))
+    return {row["id"]: row["title"] for row in rows}
+
+def get_max_user_id():
+    row = fetchone_dict("SELECT MAX(id) as m FROM users")
+    return row["m"] or 0
+
+def get_max_movie_id():
+    row = fetchone_dict("SELECT MAX(id) as m FROM movies")
+    return row["m"] or 0
+
+def get_all_movie_ids_with_language():
+    """
+    返回 (电影id, original_language) 元组列表，仅返回有 original_language 的记录。
+    """
+    rows = fetchall_dict("SELECT id, original_language FROM movies")
+    return [(r["id"], r["original_language"]) for r in rows if r["original_language"]]
+
+def get_user_view_languages(user_id):
+    """
+    根据 view_history 表，统计用户看过的电影的语言分布，并取最常见的前2种语言。
+    """
+    query = """
+        SELECT m.original_language
+        FROM view_history v
+        JOIN movies m ON v.movie_id = m.id
+        WHERE v.user_id = %s
+    """
+    rows = fetchall_dict(query, (user_id,))
+    lang_counter = Counter(r["original_language"] for r in rows if r["original_language"])
+    if not lang_counter:
+        return set()
+    # 假设我们只关心最常见的2种语言
+    top_languages = {lang for lang, _ in lang_counter.most_common(2)}
+    return top_languages
+
+def get_user_view_count(user_id):
+    """
+    返回用户在 view_history 表中的观影数量。若为 0，则表示新用户（无历史记录）。
+    """
+    query = "SELECT COUNT(*) as cnt FROM view_history WHERE user_id = %s"
+    row = fetchone_dict(query, (user_id,))
+    return row["cnt"] if row else 0
+
+def get_top_rated_movies(limit=10):
+    """
+    根据 movies 表里的 vote_average 字段，获取评分最高的电影 ID 列表。
+    如果想考虑投票数量，也可以按 (vote_average DESC, vote_count DESC) 来排序。
+    """
+    query = """
+        SELECT id
+        FROM movies
+        WHERE vote_count > 0
+        ORDER BY vote_average DESC, vote_count DESC
+        LIMIT %s
+    """
+    rows = fetchall_dict(query, (limit,))
+    return [r["id"] for r in rows]
+
+def execute_sql(query, params=None):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            conn.commit()
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\pytorch_model.py =====
+import torch
+import torch.nn as nn
+
+class TwoTowerMLPModel(nn.Module):
+    def __init__(self, num_users, num_movies, embedding_dim=32, hidden_dim=64):
+        super(TwoTowerMLPModel, self).__init__()
+        self.user_embedding = nn.Embedding(num_users + 1, embedding_dim)
+        self.movie_embedding = nn.Embedding(num_movies + 1, embedding_dim)
+
+        self.fc1 = nn.Linear(embedding_dim * 2, hidden_dim)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(hidden_dim, 1)  # logit 
+
+    def forward(self, user_ids, movie_ids):
+        user_vec = self.user_embedding(user_ids)     # (batch_size, embedding_dim)
+        movie_vec = self.movie_embedding(movie_ids)  # (batch_size, embedding_dim)
+
+        x = torch.cat([user_vec, movie_vec], dim=1)  # (batch_size, embedding_dim*2)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        logit = self.fc2(x).squeeze(1)              # (batch_size,)
+        return logit  # raw logits (BCEWithLogitsLoss)
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\__init__.py =====
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\custom_deepfm.py =====
+"""
+纯 PyTorch 实现的 DeepFM
+支持:
+  • sparse_x : LongTensor (batch, num_sparse_fields)
+  • dense_x  : FloatTensor (batch, num_dense_fields)
+输出 raw logit (BCEWithLogitsLoss 对应)
+"""
+
+import torch
+import torch.nn as nn
+
+
+class FeaturesLinear(nn.Module):
+    """ y = Σ w_i + b  （一阶项） """
+    def __init__(self, field_dims):
+        super().__init__()
+        self.fc = nn.Embedding(sum(field_dims), 1)
+        self.bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self, x):
+        # x.shape = (B, F)  每个元素都是“在其 field 的全局偏移 id”
+        return self.fc(x).sum(dim=1) + self.bias
+
+
+class DenseLinear(nn.Module):
+    """ 一阶 dense： y = w·x """
+    def __init__(self, num_dense):
+        super().__init__()
+        self.fc = nn.Linear(num_dense, 1, bias=False)
+
+    def forward(self, x):
+        return self.fc(x)
+
+
+class FeaturesEmbedding(nn.Module):
+    """ 二阶 / Deep 部分公用的 embedding """
+    def __init__(self, field_dims, embed_dim):
+        super().__init__()
+        self.embedding = nn.Embedding(sum(field_dims), embed_dim)
+
+    def forward(self, x):
+        return self.embedding(x)          # (B, F, D)
+
+
+class FactorizationMachine(nn.Module):
+    """ FM 二阶交叉项 Σ⟨v_i, v_j⟩ """
+    def forward(self, embed_x):
+        # embed_x : (B, F, D)
+        square_of_sum = embed_x.sum(dim=1) ** 2        # (B, D)
+        sum_of_square = (embed_x ** 2).sum(dim=1)      # (B, D)
+        ix = 0.5 * (square_of_sum - sum_of_square)     # (B, D)
+        return ix.sum(dim=1, keepdim=True)             # (B, 1)
+
+
+class MLP(nn.Module):
+    def __init__(self, in_dim, dims, dropout):
+        super().__init__()
+        layers = []
+        for dim in dims:
+            layers += [nn.Linear(in_dim, dim),
+                       nn.ReLU(),
+                       nn.Dropout(dropout)]
+            in_dim = dim
+        self.mlp = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.mlp(x)       # (B, last_dim)
+
+
+class DeepFM(nn.Module):
+    def __init__(self,
+                 field_dims,          # List[int] sparse vocab_sizes
+                 num_dense,           # int
+                 embed_dim=16,
+                 mlp_dims=(128, 64),
+                 dropout=0.2):
+        super().__init__()
+        self.num_dense = num_dense
+
+        self.linear_sparse = FeaturesLinear(field_dims)
+        self.linear_dense  = DenseLinear(num_dense)
+
+        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
+        self.fm = FactorizationMachine()
+
+        dnn_input_dim = len(field_dims) * embed_dim + num_dense
+        self.mlp = MLP(dnn_input_dim, mlp_dims, dropout)
+        self.mlp_out = nn.Linear(mlp_dims[-1], 1)
+
+    def forward(self, sparse_x, dense_x):
+        """
+        sparse_x : LongTensor (B, F_s)
+        dense_x  : FloatTensor(B, F_d)
+        """
+        embed_x = self.embedding(sparse_x)           # (B, Fs, D)
+
+        linear_term = self.linear_sparse(sparse_x) + self.linear_dense(dense_x)
+        fm_term     = self.fm(embed_x)               # (B, 1)
+
+        dnn_input   = torch.cat([embed_x.reshape(embed_x.size(0), -1),
+                                 dense_x], dim=1)
+        dnn_term    = self.mlp_out(self.mlp(dnn_input))  # (B, 1)
+
+        logit = linear_term + fm_term + dnn_term     # (B, 1)
+        return logit.squeeze(1)                      # (B,)
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\feature_engineer.py =====
+# . models/ranking/feature_engineer.py
+
+"""
+把数据库字段整理成 DeepCTR-Torch 需要的 DataFrame
+仅使用 *现有* 表：users · movies · movie_genre · view_history
+"""
+
+from collections import defaultdict
+from typing import List, Tuple
+
+import pandas as pd
+
+from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
+
+
+# ------------------------------------------------------------------- #
+#                        基础静态特征拉取                             #
+# ------------------------------------------------------------------- #
+def _get_movie_features() -> pd.DataFrame:
+    """
+    movie_id | genre_id | vote_average | popularity
+    若一部电影有多 genre，只取第一条；可后续改成多值特征
+    """
+    # genre
+    rows = fetchall_dict("""
+        SELECT movie_id, genre_id
+        FROM movie_genre
+        ORDER BY movie_id, genre_id
+    """)
+    first_genre = {}
+    for r in rows:
+        first_genre.setdefault(r["movie_id"], r["genre_id"])
+
+    # movies main table
+    rows = fetchall_dict("""
+        SELECT id AS movie_id,
+               vote_average,
+               popularity
+        FROM movies
+    """)
+    for r in rows:
+        r["genre_id"] = first_genre.get(r["movie_id"], 0)
+    return pd.DataFrame(rows)
+
+
+def _get_user_features() -> pd.DataFrame:
+    """
+    user_id | age
+    """
+    rows = fetchall_dict("SELECT id AS user_id, COALESCE(age, 0) AS age FROM users")
+    return pd.DataFrame(rows)
+
+
+# ------------------------------------------------------------------- #
+#                       训练数据构造 (label)                           #
+# ------------------------------------------------------------------- #
+def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
+    """
+    label = 1 -> view_history 里的正样本
+    label = 0 -> 随机负采样 (未观看)
+    """
+    pos_rows = fetchall_dict("SELECT user_id, movie_id FROM view_history")
+    if not pos_rows:                       # 数据不足
+        return pd.DataFrame()
+
+    pos_df = pd.DataFrame(pos_rows)
+    pos_df["label"] = 1
+
+    # Negative samples ------------------------------------------------
+    all_movies = {r["movie_id"] for r in fetchall_dict("SELECT id AS movie_id FROM movies")}
+    user_pos = defaultdict(set)
+    for r in pos_rows:
+        user_pos[r["user_id"]].add(r["movie_id"])
+
+    import random
+    neg_records = []
+    for u, watched in user_pos.items():
+        cand = list(all_movies - watched)
+        k = min(len(cand), neg_ratio * len(watched))
+        for m in random.sample(cand, k):
+            neg_records.append({"user_id": u, "movie_id": m, "label": 0})
+    neg_df = pd.DataFrame(neg_records)
+
+    data_df = pd.concat([pos_df, neg_df], ignore_index=True)
+
+    # 加入静态特征 ------------------------------------------------------
+    movies_df = _get_movie_features()
+    users_df = _get_user_features()
+    df = data_df.merge(movies_df, on="movie_id", how="left") \
+                .merge(users_df, on="user_id", how="left")
+
+    # 若有缺失，用 0 填充
+    df.fillna(0, inplace=True)
+    return df
+
+
+# ------------------------------------------------------------------- #
+#                         推断特征构造                                #
+# ------------------------------------------------------------------- #
+def build_infer_df(user_id: int,
+                   movie_ids: List[int],
+                   recall_scores: List[float]
+                   ) -> pd.DataFrame:
+    """
+    组装推断时特征。包含 recall_score 列！
+    """
+    movies_df = _get_movie_features()
+    users_df  = _get_user_features()
+
+    # 若用户不存在，补 age=0
+    if user_id not in users_df["user_id"].values:
+        users_df = pd.concat([users_df,
+                              pd.DataFrame([{"user_id": user_id, "age": 0}])])
+
+    infer_df = pd.DataFrame({
+        "user_id":      user_id,
+        "movie_id":     movie_ids,
+        "recall_score": recall_scores,
+    })
+
+    infer_df = (infer_df
+                .merge(movies_df, on="movie_id", how="left")
+                .merge(users_df,  on="user_id", how="left"))
+
+    infer_df.fillna(0, inplace=True)
+    return infer_df
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\infer_ranking.py =====
+import numpy as np
+import torch
+from pathlib import Path
+
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_infer_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+MODEL_PATH = BASE_DIR / "saved_model" / "deepfm_ranker.pt"
+
+def _vocab_sizes():
+    mu = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    mm = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+    mg = fetchone_dict("SELECT MAX(id) AS m FROM genres")["m"] or 0
+    return [mu + 2, mm + 2, mg + 2]
+
+def _load_model(field_dims, num_dense):
+    m = DeepFM(field_dims, num_dense)
+    try:
+        m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"), strict=False)
+        m.eval()
+        return m
+    except FileNotFoundError:
+        return None
+
+def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
+    if not movie_ids:
+        return []
+    df = build_infer_df(user_id, movie_ids, recall_scores)
+    sparse_cols = ["user_id", "movie_id", "genre_id"]
+    dense_cols = ["recall_score", "vote_average", "popularity", "age"]
+    field_dims = _vocab_sizes()
+    model = _load_model(field_dims, num_dense=len(dense_cols))
+    if model is None:
+        idx = np.argsort(-np.array(recall_scores))[:top_n]
+        return list(np.array(movie_ids)[idx])
+    xs = torch.tensor(df[sparse_cols].values, dtype=torch.long)
+    xd = torch.tensor(df[dense_cols].values, dtype=torch.float32)
+    with torch.no_grad():
+        score = torch.sigmoid(model(xs, xd)).numpy()
+    df["score"] = score
+    return df.sort_values("score", ascending=False).head(top_n)["movie_id"].tolist()
+
+if __name__ == "__main__":
+    import argparse
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
+    from DNN_TorchFM_TTower.models.recall.two_tower import load_model, recommend_warm_start
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("user_id", type=int)
+    args = parser.parse_args()
+
+    tower = load_model()
+    cand_ids, cand_scores = recommend_warm_start(tower, args.user_id, top_n=300)
+    ranked = rank_candidates(args.user_id, cand_ids, cand_scores, top_n=10)
+    titles = get_movie_titles(ranked)
+    for i, mid in enumerate(ranked, start=1):
+        print(f"{i:02}. {titles.get(mid, 'Unknown')} (ID={mid})")
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\torchfm_ranker.py =====
+"""
+torchfm_ranker.py
+"""
+
+from pathlib import Path
+from typing import Sequence
+
+import torch
+# from torchfm.deepfm import DeepFM
+from DNN_TorchFM_TTower.models.ranking.torchfm.deepfm import DeepFM
+
+MODEL_PATH = Path("saved_model/deepfm_ranker.pt")
+
+
+def create_model(field_dims: Sequence[int],
+                 embed_dim: int = 16):
+    """
+    field_dims : List[int]  每个 sparse 特征（user_id, movie_id, genre_id）的 vocab_size
+    """
+    model = DeepFM(field_dims,
+                   embed_dim=embed_dim,
+                   mlp_dims=(128, 64),
+                   dropout=0.2)
+    return model
+
+
+def save_model(model: torch.nn.Module) -> None:
+    MODEL_PATH.parent.mkdir(exist_ok=True)
+    torch.save(model.state_dict(), MODEL_PATH)
+
+
+def load_model(field_dims: Sequence[int]):
+    """
+    若模型文件存在则加载并返回 eval() 后模型，否则返回 None。
+
+    当数据库中新增了用户或电影时，只恢复已有的行，新增加的 embedding 行保持随机初始化。
+    """
+    if MODEL_PATH.exists():
+        # 1) 构建一个按最新 field_dims 大小初始化的网络
+        m = create_model(field_dims)
+        # 2) 只恢复已训练好的权重行，strict=False 保留了新加行的随机初始化
+        m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"), strict=False)
+        m.eval()
+        return m
+    return None
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\train_ranking.py =====
+"""
+Train custom DeepFM ranker using 4 dense features:
+  recall_score · vote_average · popularity · age
+Usage:
+    python -m models.ranking.train_ranking --epochs 3
+"""
+
+import os
+import argparse
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_training_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
+
+os.makedirs("saved_model", exist_ok=True)
+MODEL_PATH = "saved_model/deepfm_ranker.pt"
+
+
+def _vocab_sizes():
+    mu = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    mm = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+    mg = fetchone_dict("SELECT MAX(id) AS m FROM genres")["m"] or 0
+    # +2 for padding / OOV
+    return [mu + 2, mm + 2, mg + 2]
+
+
+def _to_tensor(df, sparse_cols, dense_cols):
+    Xs = torch.tensor(df[sparse_cols].values, dtype=torch.long)
+    Xd = torch.tensor(df[dense_cols].values, dtype=torch.float32)
+    y  = torch.tensor(df["label"].values, dtype=torch.float32)
+    return TensorDataset(Xs, Xd, y)
+
+
+def main(epochs=3, batch_size=2048, neg_ratio=1):
+    df = build_training_df(neg_ratio)
+    if df.empty:
+        print("[train_ranking] no training data")
+        return
+
+    sparse_cols = ["user_id", "movie_id", "genre_id"]
+    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+
+    # During training, recall_score is not available -> fill with 0.0
+    df["recall_score"] = 0.0
+
+    tr_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+    train_loader = DataLoader(_to_tensor(tr_df, sparse_cols, dense_cols),
+                              batch_size=batch_size, shuffle=True)
+    val_loader   = DataLoader(_to_tensor(val_df, sparse_cols, dense_cols),
+                              batch_size=batch_size, shuffle=False)
+
+    field_dims = _vocab_sizes()
+    model = DeepFM(field_dims,
+                   num_dense=len(dense_cols),
+                   embed_dim=16,
+                   mlp_dims=(128, 64),
+                   dropout=0.2)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    loss_fn   = nn.BCEWithLogitsLoss()
+
+    print(f"[train_ranking] samples={len(df)}  pos:neg≈1:{neg_ratio}")
+    for ep in range(1, epochs + 1):
+        # training
+        model.train()
+        total_loss, count = 0.0, 0
+        for Xs, Xd, y in tqdm(train_loader, desc=f"Ep {ep}/{epochs}", ncols=80):
+            Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
+            optimizer.zero_grad()
+            loss = loss_fn(model(Xs, Xd), y)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item() * y.size(0)
+            count += y.size(0)
+        print(f"  train_loss={total_loss/count:.4f}")
+
+        # validation
+        model.eval()
+        total_val, count_val = 0.0, 0
+        with torch.no_grad():
+            for Xs, Xd, y in val_loader:
+                Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
+                val_loss = loss_fn(model(Xs, Xd), y).item()
+                total_val += val_loss * y.size(0)
+                count_val += y.size(0)
+        print(f"  val_loss  ={total_val/count_val:.4f}")
+
+    # save final model
+    torch.save(model.cpu().state_dict(), MODEL_PATH)
+    print("✅ DeepFM saved →", MODEL_PATH)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--epochs",    type=int, default=3)
+    parser.add_argument("--batch",     type=int, default=2048)
+    parser.add_argument("--neg_ratio", type=int, default=1)
+    args = parser.parse_args()
+    main(args.epochs, args.batch, args.neg_ratio)
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\__init__.py =====
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\ranking\torchfm\deepfm.py =====
+# DNN_TorchFM_TTower\models\ranking\torchfm\deepfm.py
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class FeaturesLinear(nn.Module):
+    def __init__(self, field_dims):
+        super().__init__()
+        self.fc = nn.Embedding(sum(field_dims), 1)
+        self.bias = nn.Parameter(torch.zeros((1,)))
+
+    def forward(self, x):
+        return torch.sum(self.fc(x), dim=1) + self.bias
+
+
+class FeaturesEmbedding(nn.Module):
+    def __init__(self, field_dims, embed_dim):
+        super().__init__()
+        self.embedding = nn.Embedding(sum(field_dims), embed_dim)
+
+    def forward(self, x):
+        return self.embedding(x)
+
+
+class MultiLayerPerceptron(nn.Module):
+    def __init__(self, input_dim, dims, dropout):
+        super().__init__()
+        layers = []
+        for dim in dims:
+            layers.append(nn.Linear(input_dim, dim))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(p=dropout))
+            input_dim = dim
+        self.mlp = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.mlp(x)
+
+
+class DeepFM(nn.Module):
+    def __init__(self, field_dims, embed_dim, mlp_dims, dropout):
+        super().__init__()
+        self.embedding = FeaturesEmbedding(field_dims, embed_dim)
+        self.linear = FeaturesLinear(field_dims)
+        self.fm = FactorizationMachine(reduce_sum=True)
+        self.mlp = MultiLayerPerceptron(len(field_dims) * embed_dim, mlp_dims, dropout)
+
+    def forward(self, x):
+        embed_x = self.embedding(x)
+        x = self.linear(x) + self.fm(embed_x) + torch.sum(self.mlp(embed_x.view(embed_x.size(0), -1)), dim=1, keepdim=True)
+        return torch.sigmoid(x.squeeze(1))
+
+
+class FactorizationMachine(nn.Module):
+    def __init__(self, reduce_sum=True):
+        super().__init__()
+        self.reduce_sum = reduce_sum
+
+    def forward(self, x):
+        square_of_sum = torch.sum(x, dim=1) ** 2
+        sum_of_square = torch.sum(x ** 2, dim=1)
+        ix = square_of_sum - sum_of_square
+        if self.reduce_sum:
+            ix = torch.sum(ix, dim=1, keepdim=True)
+        return 0.5 * ix
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\recall\cold_start.py =====
+# models/recall/cold_start.py
+import random
+from DNN_TorchFM_TTower.models.db import fetchall_dict
+
+def recommend_cold_start(top_n=10):
+    """
+    针对无历史用户(冷启动)：先选一批高评分热门电影，再随机抽取 top_n。
+    示例：我们假设在 movies 表中有 vote_average, vote_count 字段。
+    """
+    query = """
+        SELECT id
+        FROM movies
+        WHERE vote_count > 0
+        ORDER BY vote_average DESC, vote_count DESC
+        LIMIT 50
+    """
+    rows = fetchall_dict(query)
+    if not rows:
+        return []
+    candidate_ids = [r["id"] for r in rows]
+    
+    # 从这 50 部评分最高的影片里随机抽 top_n
+    if len(candidate_ids) <= top_n:
+        return candidate_ids
+    return random.sample(candidate_ids, top_n)
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\recall\train_incremental.py =====
+# models/recall/train_incremental.py
+"""
+Two-Tower 模型增量训练脚本
+= 原 train_incremental.py，但从 train_two_tower 导入数据构造工具
+"""
+
+import os
+import time
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
+from DNN_TorchFM_TTower.models.recall.train_two_tower import (
+    generate_training_data,
+    RecommendationDataset,
+)
+
+MODEL_PATH = "saved_model/dnn_recommender.pt"
+
+
+def incremental_train(neg_ratio: int = 1,
+                      epochs: int = 3,
+                      lr: float = 5e-4):
+    """
+    • 用最新行为重新构造正/负样本  
+    • 在已有模型参数基础上小步训练
+    """
+    df = generate_training_data(neg_ratio)
+    if df.empty:
+        print("[incremental] 无训练数据，跳过")
+        return
+
+    loader = DataLoader(RecommendationDataset(df),
+                        batch_size=64, shuffle=True)
+
+    max_u = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    max_m = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(
+            "[incremental] 基础模型不存在，请先完整训练"
+        )
+
+    model = TwoTowerMLPModel(max_u, max_m,
+                             embedding_dim=32, hidden_dim=64)
+    model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-5)
+
+    model.train()
+    tic = time.time()
+    for ep in range(1, epochs + 1):
+        losses = []
+        for u, m, y in loader:
+            optimizer.zero_grad()
+            loss = criterion(model(u, m), y)
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.item())
+        print(f"[incremental] epoch {ep}/{epochs}  "
+              f"loss={np.mean(losses):.4f}")
+
+    torch.save(model.state_dict(), MODEL_PATH)
+    print(f"[incremental] Δ 训练完成，用时 {time.time() - tic:.1f}s")
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--epochs", type=int, default=3)
+    ap.add_argument("--neg_ratio", type=int, default=1)
+    args = ap.parse_args()
+
+    incremental_train(neg_ratio=args.neg_ratio, epochs=args.epochs)
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\recall\train_two_tower.py =====
+# models/recall/train_two_tower.py
+"""
+Two-Tower 召回模型离线训练脚本
+= 旧版 train.py，调整了 import 路径并改名
+"""
+import os
+import random
+import time
+from pathlib import Path
+from typing import List, Dict, Set
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm  # ← 新增
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+
+from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
+from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
+
+# ---------------------------------------------------------------------------
+#                     固定 saved_model 目录到包根下                           #
+# ---------------------------------------------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parents[3]          # …/CINEIA/DNN_TorchFM_TTower
+SAVE_DIR     = PROJECT_ROOT / "saved_model"
+SAVE_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_PATH   = SAVE_DIR / "dnn_recommender.pt"
+
+
+# os.makedirs("saved_model", exist_ok=True)
+
+# --------------------------------------------------------------------------- #
+#                            数据提取 / 特征构造                               #
+# --------------------------------------------------------------------------- #
+def get_all_movies() -> List[int]:
+    return [r["id"] for r in fetchall_dict("SELECT id FROM movies")]
+
+
+def get_movie_genres() -> Dict[int, Set[int]]:
+    rows = fetchall_dict("SELECT movie_id, genre_id FROM movie_genre")
+    m2g = {}
+    for r in rows:
+        m2g.setdefault(r["movie_id"], set()).add(r["genre_id"])
+    return m2g
+
+
+def get_positive_samples() -> pd.DataFrame:
+    """
+    view_history 中的每条观看记录视为正样本 (label=1)
+    """
+    rows = fetchall_dict("SELECT user_id, movie_id FROM view_history")
+    if not rows:
+        return pd.DataFrame(columns=["user_id", "movie_id", "rating"])
+    df = pd.DataFrame(rows)
+    df["rating"] = 1.0
+    return df
+
+
+def generate_training_data(neg_ratio: int = 1) -> pd.DataFrame:
+    """
+    正样本：view_history  
+    负样本：同用户未看过，且题材与已看影片不重叠的随机采样
+    """
+    pos_df = get_positive_samples()
+    if pos_df.empty:
+        return pos_df
+
+    all_movies = set(get_all_movies())
+    movie_genres = get_movie_genres()
+
+    user_pos = pos_df.groupby("user_id")["movie_id"].apply(set).to_dict()
+    user_genres = {
+        u: {g for m in ms for g in movie_genres.get(m, set())}
+        for u, ms in user_pos.items()
+    }
+
+    neg_records = []
+    for u, pos in user_pos.items():
+        watched_genres = user_genres.get(u, set())
+        # candidate: 未看 & 题材不重叠
+        cand = [m for m in all_movies - pos
+                if movie_genres.get(m, set()).isdisjoint(watched_genres)]
+        num_neg = min(len(cand), neg_ratio * len(pos))
+        if num_neg:
+            neg_records += [{"user_id": u, "movie_id": m, "rating": 0.0}
+                            for m in random.sample(cand, num_neg)]
+
+    neg_df = pd.DataFrame(neg_records)
+    train_df = pd.concat([pos_df, neg_df], ignore_index=True)
+    return train_df
+
+
+class RecommendationDataset(Dataset):
+    def __init__(self, df: pd.DataFrame):
+        self.users = torch.tensor(df["user_id"].values, dtype=torch.long)
+        self.movies = torch.tensor(df["movie_id"].values, dtype=torch.long)
+        self.labels = torch.tensor(df["rating"].values, dtype=torch.float32)
+
+    def __len__(self):
+        return len(self.users)
+
+    def __getitem__(self, idx):
+        return self.users[idx], self.movies[idx], self.labels[idx]
+
+
+def _get_max_ids() -> tuple[int, int]:
+    mu = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    mm = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+    return mu, mm
+
+
+# --------------------------------------------------------------------------- #
+#                               训 练 主 程 序                                 #
+# --------------------------------------------------------------------------- #
+def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
+    df = generate_training_data(neg_ratio)
+    if df.empty:
+        print("[train_two_tower] ❌ 训练集为空")
+        return
+
+    print(f"[train_two_tower] 样本 {len(df)} | 用户 {df['user_id'].nunique()} | 电影 {df['movie_id'].nunique()}")
+
+    train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+    train_loader = DataLoader(RecommendationDataset(train_df),
+                              batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(RecommendationDataset(val_df),
+                            batch_size=batch_size, shuffle=False)
+
+    max_u, max_m = _get_max_ids()
+    model = TwoTowerMLPModel(max_u, max_m, embedding_dim=32, hidden_dim=64)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+
+    best_val = float("inf")
+    for ep in range(1, epochs + 1):
+        ep_start = time.time()
+        model.train()
+        tloss = []
+
+        for u, m, y in tqdm(train_loader, desc=f"Epoch {ep}/{epochs}", ncols=80):
+            u, m, y = u.to(device), m.to(device), y.to(device)
+            optimizer.zero_grad()
+            loss = criterion(model(u, m), y)
+            loss.backward()
+            optimizer.step()
+            tloss.append(loss.item())
+
+        avg_t = np.mean(tloss)
+
+        # ---------- 验证 ----------
+        model.eval()
+        vloss = []
+        with torch.no_grad():
+            for u, m, y in val_loader:
+                u, m, y = u.to(device), m.to(device), y.to(device)
+                vloss.append(criterion(model(u, m), y).item())
+        avg_v = np.mean(vloss)
+
+        print(f"[Ep {ep:02}] train={avg_t:.4f}  val={avg_v:.4f}  time={time.time()-ep_start:.1f}s")
+
+        if avg_v < best_val:
+            best_val = avg_v
+            torch.save(model.state_dict(), MODEL_PATH)
+            print("   ↳  Model saved")
+
+    print(f"[train_two_tower] Done，best val={best_val:.4f}")
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--epochs", type=int, default=3)        # 默认为 3
+    ap.add_argument("--batch", type=int, default=128)
+    ap.add_argument("--neg_ratio", type=int, default=1)
+    args = ap.parse_args()
+
+    main(epochs=args.epochs, batch_size=args.batch, neg_ratio=args.neg_ratio)
+
+===== 文件: ./DNN_TorchFM_TTower\models\recall\two_tower.py =====
+"""
+Two-Tower recall model inference logic
+
+把原先的 warm_start.py + infer.py 合并成一个文件，供 service 层调用：
+    from models.recall.two_tower import load_model, recommend_warm_start
+"""
+
+import time
+from pathlib import Path
+from typing import List, Tuple
+
+import numpy as np
+import torch
+
+from DNN_TorchFM_TTower.models.db import (
+    get_max_user_id,
+    get_max_movie_id,
+    get_all_movie_ids_with_language,
+    get_user_view_languages,
+)
+from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
+
+def load_model(model_path: str = None, embedding_dim: int = 32) -> TwoTowerMLPModel:
+    if model_path is None:
+        model_path = Path(__file__).resolve().parents[3] / 'saved_model' / 'dnn_recommender.pt'
+    model_path = Path(model_path)
+    if not model_path.exists():
+        raise FileNotFoundError(f"[two_tower] Model file {model_path} not found. Please train first.")
+    max_u = get_max_user_id()
+    max_m = get_max_movie_id()
+    model = TwoTowerMLPModel(num_users=max_u, num_movies=max_m, embedding_dim=embedding_dim, hidden_dim=64)
+    state = torch.load(model_path, map_location=torch.device("cpu"))
+    model.load_state_dict(state, strict=False)
+    model.eval()
+    return model
+
+def recommend_warm_start(model: TwoTowerMLPModel, user_id: int, top_n: int = 10) -> Tuple[List[int], List[float]]:
+    tic = time.time()
+    preferred_langs = get_user_view_languages(user_id)
+    all_movies = get_all_movie_ids_with_language()
+    if preferred_langs:
+        candidate_movies = [m for m, lang in all_movies if lang in preferred_langs]
+    else:
+        candidate_movies = [m for m, _ in all_movies]
+    if not candidate_movies:
+        return [], []
+    movie_tensor = torch.tensor(candidate_movies, dtype=torch.long)
+    user_tensor = torch.full((len(candidate_movies),), user_id, dtype=torch.long)
+    with torch.no_grad():
+        logits = model(user_tensor, movie_tensor)
+        scores = torch.sigmoid(logits).numpy().flatten()
+    top_idx = np.argsort(-scores)[:top_n]
+    top_movie_ids = np.array(candidate_movies)[top_idx]
+    top_scores = scores[top_idx]
+    print(f"[two_tower] Inference finished in {time.time() - tic:.2f}s")
+    return top_movie_ids.tolist(), top_scores.tolist()
+
+if __name__ == "__main__":
+    import argparse
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
+    ap = argparse.ArgumentParser()
+    ap.add_argument("user_id", type=int)
+    ap.add_argument("--top_n", type=int, default=10)
+    args = ap.parse_args()
+    mdl = load_model()
+    mids, scs = recommend_warm_start(mdl, args.user_id, args.top_n)
+    title_map = get_movie_titles(mids)
+    print(f"\nTop {args.top_n} recommendations for user {args.user_id}:")
+    for idx, (mid, score) in enumerate(zip(mids, scs), start=1):
+        print(f"  {idx:02}. ID={mid:<6}  {title_map.get(mid, 'Unknown'):<40}  score={score:.4f}")
+
+
+===== 文件: ./DNN_TorchFM_TTower\models\recall\__init__.py =====
+
+
+===== 文件: ./DNN_TorchFM_TTower\scripts\incremental.py =====
+import numpy as np
+import torch
+from pathlib import Path
+
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_infer_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+MODEL_PATH = BASE_DIR / "saved_model" / "deepfm_ranker.pt"
+
+def _vocab_sizes():
+    mu = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    mm = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+    mg = fetchone_dict("SELECT MAX(id) AS m FROM genres")["m"] or 0
+    return [mu + 2, mm + 2, mg + 2]
+
+def _load_model(field_dims, num_dense):
+    model = DeepFM(field_dims, num_dense)
+    if MODEL_PATH.exists():
+        state = torch.load(MODEL_PATH, map_location="cpu")
+        model.load_state_dict(state, strict=False)
+        model.eval()
+        return model
+    return None
+
+def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
+    if not movie_ids:
+        return []
+    df = build_infer_df(user_id, movie_ids, recall_scores)
+    sparse_cols = ["user_id", "movie_id", "genre_id"]
+    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    field_dims  = _vocab_sizes()
+    model = _load_model(field_dims, num_dense=len(dense_cols))
+    if model is None:
+        idx = np.argsort(-np.array(recall_scores))[:top_n]
+        return list(np.array(movie_ids)[idx])
+    xs = torch.tensor(df[sparse_cols].values, dtype=torch.long)
+    xd = torch.tensor(df[dense_cols].values, dtype=torch.float32)
+    with torch.no_grad():
+        scores = torch.sigmoid(model(xs, xd)).numpy()
+    df["score"] = scores
+    return df.sort_values("score", ascending=False).head(top_n)["movie_id"].tolist()
+
+if __name__ == "__main__":
+    import argparse
+    from DNN_TorchFM_TTower.models.recall.two_tower import load_model, recommend_warm_start
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
+    parser = argparse.ArgumentParser()
+    parser.add_argument("user_id", type=int)
+    args = parser.parse_args()
+    tower = load_model()
+    cand_ids, cand_scores = recommend_warm_start(tower, args.user_id, top_n=300)
+    ranked = rank_candidates(args.user_id, cand_ids, cand_scores, top_n=10)
+    titles = get_movie_titles(ranked)
+    for i, mid in enumerate(ranked, 1):
+        print(f"{i:02}. {titles.get(mid,'Unknown')} (ID={mid})")
+
+
+===== 文件: ./DNN_TorchFM_TTower\scripts\interactive_demo.py =====
+#!/usr/bin/env python3
+"""
+scripts/interactive_demo.py
+CLI 交互式推荐演示 interactive demo
+
+流程：
+  1. 输入一个用户 ID（若不存在自动插入）
+  2. 调用 service.recommender 推荐 TOP_N 部电影
+  3. 用户手动选择若干部想看的 → 写入 view_history
+  4. 每 LOOP_FOR_RETRAIN 轮：
+        • 召回侧增量训练 1 epoch
+        • 精排侧增量训练 1 epoch
+  5. 回到步骤 2，直到输入 q / quit 退出
+"""
+
+from typing import List
+
+# ------- readline 在 Linux / macOS 默认有；Windows 没有也不影响 -------
+try:
+    import readline  # noqa: F401
+except ImportError:
+    pass
+
+from DNN_TorchFM_TTower.models.db import (
+    fetchone_dict, execute_sql,
+    get_movie_titles, get_user_view_count,
+)
+
+from DNN_TorchFM_TTower.models.recall.train_incremental import incremental_train as recall_inc_train
+from DNN_TorchFM_TTower.models.ranking.train_ranking import main as ranking_train_main
+from DNN_TorchFM_TTower.service.recommender import recommend_movies_for_user
+
+TOP_N = 10
+LOOP_FOR_RETRAIN = 3      # 每 3 轮做一次增量重训（可调为 0 关闭）
+
+
+# ------------------------------------------------------------------ #
+#                 DB 帮助函数：建用户 / 插观看记录                    #
+# ------------------------------------------------------------------ #
+def ensure_user(user_id: int):
+    if not fetchone_dict("SELECT 1 FROM users WHERE id=%s", (user_id,)):
+        execute_sql(
+            "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
+            (user_id, f"cli_{user_id}@demo.com", b"hash_placeholder"),
+        )
+        print(f"✅ new user created {user_id}")
+
+
+def insert_views(user_id: int, movie_ids: List[int]):
+    for mid in movie_ids:
+        execute_sql(
+            "INSERT INTO view_history (user_id, movie_id) VALUES (%s, %s)",
+            (user_id, mid),
+        )
+
+
+# ------------------------------------------------------------------ #
+#                             交互函数                               #
+# ------------------------------------------------------------------ #
+def choose_movies(candidates: List[int], titles: dict[int, str]) -> List[int] | None:
+    print("\nPlease enter the serial number of the movie you want to watch (separated by Spaces), or exit with q:")
+    for i, m in enumerate(candidates, 1):
+        print(f"[{i:02}] ID={m} | {titles.get(m, 'Unknown')} ")
+
+    while True:
+        raw = input("your choices: ").strip().lower()
+        if raw in {"q", "quit"}:
+            return None
+        try:
+            idxs = [int(s) for s in raw.split()]
+            chosen = [candidates[i - 1] for i in idxs if 1 <= i <= len(candidates)]
+            return chosen
+        except ValueError:
+            print("The input format is incorrect. Please re-enter")
+
+
+# ------------------------------------------------------------------ #
+#                         增量训练封装                                #
+# ------------------------------------------------------------------ #
+def incremental_retrain():
+    print("\n Incremental training begins (recall 1 epoch + rerank 1 epoch)...")
+    recall_inc_train(neg_ratio=1, epochs=1)
+    ranking_train_main(epochs=1, batch_size=4096, neg_ratio=1)
+    print("incremental training fini\n")
+
+
+# ------------------------------------------------------------------ #
+#                           主循环                                   #
+# ------------------------------------------------------------------ #
+def interactive_loop(user_id: int):
+    ensure_user(user_id)
+    loop_cnt = 0
+
+    while True:
+        viewed = get_user_view_count(user_id)
+        print(f"\n=== user {user_id} has watched {viewed} films ===")
+
+        mids, scores, strategy = recommend_movies_for_user(user_id, n_final=TOP_N)
+        if not mids:
+            print("  unable to fetch datas, please check the database connection")
+            break
+
+        title_map = get_movie_titles(mids)
+        chosen = choose_movies(mids, title_map)
+        if chosen is None:
+            print("\n👋 Bye~")
+            break
+
+        insert_views(user_id, chosen)
+        print(f" 已记录观看 {len(chosen)} 部影片。")
+        loop_cnt += 1
+
+        # ---- 条件触发增量训练 ----
+        if LOOP_FOR_RETRAIN and loop_cnt % LOOP_FOR_RETRAIN == 0:
+            incremental_retrain()
+
+
+
+# ------------------------------------------------------------------ #
+#                                 main                               #
+# ------------------------------------------------------------------ #
+if __name__ == "__main__":
+    try:
+        uid = int(input("Please enter the user ID (fill in any integer for a new one) : ").strip())
+    except ValueError:
+        print(" x The user ID must be an integer")
+        exit(1)
+
+    interactive_loop(uid)
+
+
+===== 文件: ./DNN_TorchFM_TTower\service\recommender copy.py =====
+# service/recommender.py
+
+"""
+统一推荐入口：
+    • 新用户       → 冷启动 (PopRec + 随机多样化)
+    • 老用户       → Two-Tower 召回  → DeepFM 精排
+对上层调用者隐藏实现细节，只暴露一个函数 `recommend_movies_for_user`
+"""
+
+from __future__ import annotations
+
+import functools
+import time
+from typing import List, Tuple
+
+from models.db import get_user_view_count
+from models.recall import cold_start
+from models.recall.two_tower import load_model as _load_tower, recommend_warm_start
+from models.ranking.infer_ranking import rank_candidates
+
+# --------------------------------------------------------------------------- #
+#                          全局缓存 —— 只加载一次                              #
+# --------------------------------------------------------------------------- #
+_TOWER_MODEL = functools.lru_cache(maxsize=1)(_load_tower)()   # type: ignore
+
+
+# --------------------------------------------------------------------------- #
+#                          核 心 接 口                                        #
+# --------------------------------------------------------------------------- #
+def recommend_movies_for_user(user_id: int,
+                              n_recall: int = 300,
+                              n_final: int = 20
+                              ) -> List[int]:
+    """
+    返回最终推荐的 movie_id 列表 (长度 n_final，不含重复)。
+    若精排模型未训练，则直接按召回分排序。
+    """
+    t0 = time.time()
+    view_cnt = get_user_view_count(user_id)
+
+    # -------- 冷启动 --------
+    if view_cnt == 0:
+        print(f"[recommender] user {user_id} cold-start")
+        movie_ids = cold_start.recommend_cold_start(top_n=n_final)
+        print(f"[recommender] cold-start done ({len(movie_ids)} items, {time.time()-t0:.2f}s)")
+        return movie_ids
+
+    # -------- 热启动：召回 --------
+    recall_ids, recall_scores = recommend_warm_start(
+        _TOWER_MODEL, user_id, top_n=n_recall
+    )
+    if not recall_ids:
+        # 回退：冷启动
+        print(f"[recommender] warm-start empty, fallback to cold")
+        return cold_start.recommend_cold_start(top_n=n_final)
+
+    # -------- 精排 --------
+    ranked = rank_candidates(user_id, recall_ids, recall_scores, top_n=n_final)
+    print(f"[recommender] warm-start+rank done ({len(ranked)} items, {time.time()-t0:.2f}s)")
+    return ranked
+
+
+# --------------------------------------------------------------------------- #
+#                           CLI 测 试                                          #
+# --------------------------------------------------------------------------- #
+if __name__ == "__main__":
+    import argparse
+    from models.db import get_movie_titles
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("user_id", type=int)
+    ap.add_argument("--top", type=int, default=10)
+    args = ap.parse_args()
+
+    mids = recommend_movies_for_user(args.user_id, n_final=args.top)
+    titles = get_movie_titles(mids)
+
+    print("\n推荐结果：")
+    for i, mid in enumerate(mids, 1):
+        print(f"{i:02}. {titles.get(mid, 'Unknown')}  (ID={mid})")
+
+
+===== 文件: ./DNN_TorchFM_TTower\service\recommender.py =====
+# service/recommender.py
+
+"""
+统一推荐入口：
+    • 新用户       → 冷启动 (PopRec + 随机多样化)
+    • 老用户       → Two-Tower 召回  → DeepFM 精排
+对上层调用者隐藏实现细节，只暴露一个函数 `recommend_movies_for_user`
+"""
+
+from __future__ import annotations
+
+import time
+from typing import Tuple
+
+from DNN_TorchFM_TTower.models.db import (
+    get_user_view_count,
+    fetchone_dict,
+    execute_sql,
+)
+from DNN_TorchFM_TTower.models.recall import cold_start
+from DNN_TorchFM_TTower.models.recall.two_tower import load_model as _load_tower, recommend_warm_start
+from DNN_TorchFM_TTower.models.ranking.infer_ranking import rank_candidates
+
+
+def _get_tower_model():
+    """
+    每次都动态加载 Two-Tower 模型，以保证使用最新的 vocab size。
+    """
+    return _load_tower()
+
+
+def recommend_movies_for_user(user_id: int,
+                              n_recall: int = 300,
+                              n_final:  int = 20
+                              ) -> Tuple[list[int], list[float], str]:
+    """
+    返回 (movie_ids, scores, strategy)
+      - strategy: 'cold' | 'warm' | 'warm+rank'
+    """
+
+    # 1) 确保新用户在 users 表中有记录
+    if not fetchone_dict("SELECT 1 FROM users WHERE id=%s", (user_id,)):
+        execute_sql(
+            "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
+            (user_id, f"api_{user_id}@demo.com", b"hash_placeholder"),
+        )
+
+    # 2) 获取用户历史观看次数
+    view_cnt = get_user_view_count(user_id)
+
+    # -------- 冷启动 --------
+    if view_cnt == 0:
+        mids = cold_start.recommend_cold_start(top_n=n_final)
+        return mids, [None] * len(mids), "cold"
+
+    # -------- 热启动 (Two-Tower) + fallback --------
+    recall_model = _get_tower_model()
+    try:
+        recall_ids, recall_scores = recommend_warm_start(
+            recall_model, user_id, top_n=n_recall
+        )
+    except IndexError:
+        # Embedding 越界，新用户/新电影尚未在模型中：fallback 到冷启动
+        print(f"[recommender] user {user_id} embedding 越界，fallback cold-start")
+        mids = cold_start.recommend_cold_start(top_n=n_final)
+        return mids, [None] * len(mids), "cold"
+
+    if not recall_ids:
+        mids = cold_start.recommend_cold_start(top_n=n_final)
+        return mids, [None] * len(mids), "cold"
+
+    # -------- DeepFM 精排 --------
+    mids = rank_candidates(user_id, recall_ids, recall_scores, top_n=n_final)
+    return mids, recall_scores[:n_final], "warm+rank"
+
+
+# -------------------- CLI 测试 --------------------
+if __name__ == "__main__":
+    import json
+    import datetime
+    import argparse
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("user_id", type=int)
+    ap.add_argument("--top", type=int, default=10)
+    args = ap.parse_args()
+
+    mids, scores, strategy = recommend_movies_for_user(args.user_id, n_final=args.top)
+    titles = get_movie_titles(mids)
+    payload = {
+        "user_id": args.user_id,
+        "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+        "strategy": strategy,
+        "items": [
+            {
+                "rank": i + 1,
+                "movie_id": mid,
+                "title": titles.get(mid, "Unknown"),
+                "score": float(scores[i]) if scores[i] is not None else None,
+            }
+            for i, mid in enumerate(mids)
+        ],
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+===== 文件: ./DNN_TorchFM_TTower\service\__init__.py =====
+
