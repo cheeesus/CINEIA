@@ -79,7 +79,7 @@ if __name__ == "__main__":
     import json
     import datetime
     import argparse
-    from DNN_TorchFM_TTower.models.db import get_movie_titles
+    from DNN_TorchFM_TTower.models.db import get_movie_titles, get_movie_genres
 
     ap = argparse.ArgumentParser()
     ap.add_argument("user_id", type=int)
@@ -97,6 +97,7 @@ if __name__ == "__main__":
                 "rank": i + 1,
                 "movie_id": mid,
                 "title": titles.get(mid, "Unknown"),
+                "genre": genres.get(mid, ""),  
                 "score": float(scores[i]) if scores[i] is not None else None,
             }
             for i, mid in enumerate(mids)

@@ -1,9 +1,12 @@
+# 文件: models/ranking/train_ranking.py
 import os
 import argparse
+
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, recall_score
 from tqdm import tqdm
 
 from DNN_TorchFM_TTower.models.db import fetchone_dict
@@ -43,9 +46,9 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
 
     # 划分训练/验证集
     tr_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
-    train_loader = DataLoader(_to_tensor(tr_df, sparse_cols, dense_cols), 
+    train_loader = DataLoader(_to_tensor(tr_df, sparse_cols, dense_cols),
                               batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(_to_tensor(val_df, sparse_cols, dense_cols),   
+    val_loader   = DataLoader(_to_tensor(val_df, sparse_cols, dense_cols),
                               batch_size=batch_size, shuffle=False)
 
     # 构建 DeepFM 模型
@@ -72,14 +75,15 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
         for Xs, Xd, y in tqdm(train_loader, desc=f"Ep {ep}/{epochs}", ncols=80):
             Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
             optimizer.zero_grad()
-            loss = loss_fn(model(Xs, Xd), y)
+            logits = model(Xs, Xd)
+            loss   = loss_fn(logits, y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item() * y.size(0)
             count += y.size(0)
         print(f"  train_loss={total_loss/count:.4f}")
 
-        # 验证
+        # 验证（只打印 loss）
         model.eval()
         total_val, count_val = 0.0, 0
         with torch.no_grad():
@@ -93,6 +97,25 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     # 保存模型
     torch.save(model.cpu().state_dict(), MODEL_PATH)
     print("DeepFM saved →", MODEL_PATH)
+
+    # ===== 新增：在验证集上计算 Accuracy 和 Recall =====
+    model.eval()
+    all_true, all_pred = [], []
+    with torch.no_grad():
+        for Xs, Xd, y in val_loader:
+            # 同步到当前 device
+            Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
+            logits = model(Xs, Xd)
+            probs  = torch.sigmoid(logits)
+            preds  = (probs >= 0.5).float()
+
+            all_true.extend(y.cpu().numpy().tolist())
+            all_pred.extend(preds.cpu().numpy().tolist())
+
+    acc = accuracy_score(all_true, all_pred)
+    rec = recall_score(all_true, all_pred, zero_division=0)
+    print(f"[train_ranking] Validation Accuracy: {acc * 100:.2f}%")
+    print(f"[train_ranking] Validation Recall:   {rec * 100:.2f}%")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

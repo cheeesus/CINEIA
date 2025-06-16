@@ -20,8 +20,9 @@ def recommend(user_id: int):
     mids, scores, strategy = recommend_movies_for_user(user_id, n_final=top)
     mids_py = [int(x) for x in mids]
 
-    # Step 2: Query database for additional movie details
+    # Step 2: Query database for additional movie details and genres
     with g.db.cursor() as cursor:
+        # Fetch movie details
         cursor.execute(
             """
             SELECT id, title, release_date, poster_path, vote_average
@@ -30,8 +31,32 @@ def recommend(user_id: int):
             """, 
             (mids_py,)
         )
-        movie_details = {row[0]: {"title": row[1], "release_date": row[2], "poster_url": f"https://image.tmdb.org/t/p/w500{row[3]}" if row[3] else None, 'rating': row[4]} 
-                         for row in cursor.fetchall()}
+        movie_details = {
+            row[0]: {
+                "title": row[1],
+                "release_date": row[2],
+                "poster_url": f"https://image.tmdb.org/t/p/w500{row[3]}" if row[3] else None,
+                "rating": row[4]
+            }
+            for row in cursor.fetchall()
+        }
+
+        # Fetch genres for all recommended movies
+        cursor.execute(
+            """
+            SELECT mg.movie_id, g.name
+            FROM movie_genre mg
+            JOIN genres g ON mg.genre_id = g.id
+            WHERE mg.movie_id = ANY(%s)
+            """, 
+            (mids_py,)
+        )
+        genre_map = {}
+        for movie_id, genre_name in cursor.fetchall():
+            if movie_id not in genre_map:
+                genre_map[movie_id] = []
+            genre_map[movie_id].append(genre_name)
+
     # Step 3: Build response with details
     return jsonify({
         "user_id": user_id,
@@ -44,11 +69,13 @@ def recommend(user_id: int):
                 "release_date": movie_details.get(mid, {}).get("release_date"),
                 "poster_url": movie_details.get(mid, {}).get("poster_url"),
                 "rating": movie_details.get(mid, {}).get("rating"),
+                "genres": genre_map.get(mid, []),  # List of genres for the movie
                 "score": float(scores[i]) if scores[i] is not None else None
             }
             for i, mid in enumerate(mids_py)
         ]
     })
+
 
 @movies_bp.route('/recent', methods=['GET'])
 def get_movies_recent():

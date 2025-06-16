@@ -18,6 +18,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from sklearn.metrics import accuracy_score, recall_score
 
 from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
@@ -173,6 +174,25 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
 
     print(f"[train_two_tower] Done，best val={best_val:.4f}")
 
+
+    # ===== 新增：在验证集上计算 Accuracy 和 Recall =====
+    model.eval()
+    all_true, all_pred = [], []
+    with torch.no_grad():
+        for u, m, y in val_loader:
+            # 同步到 model 使用的 device
+            u, m, y = u.to(device), m.to(device), y.to(device)
+            logits = model(u, m)
+            probs = torch.sigmoid(logits)
+            preds = (probs >= 0.5).float()
+
+            all_true.extend(y.cpu().numpy().tolist())
+            all_pred.extend(preds.cpu().numpy().tolist())
+
+    acc = accuracy_score(all_true, all_pred)
+    rec = recall_score(all_true, all_pred, zero_division=0)
+    print(f"[train_two_tower] Validation Accuracy: {acc * 100:.2f}%")
+    print(f"[train_two_tower] Validation Recall:   {rec * 100:.2f}%")
 
 if __name__ == "__main__":
     import argparse
