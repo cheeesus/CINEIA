@@ -25,10 +25,10 @@ from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 # ---------------------------------------------------------------------------
 #                     固定 saved_model 目录到包根下                           #
 # ---------------------------------------------------------------------------
-ROOT_DIR   = Path(__file__).resolve().parents[2]           # …/CINEIA/DNN_TorchFM_TTower
-SAVE_DIR   = ROOT_DIR / "saved_model"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]          # …/CINEIA/DNN_TorchFM_TTower
+SAVE_DIR     = PROJECT_ROOT / "saved_model"
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
-MODEL_PATH = SAVE_DIR / "dnn_recommender.pt"
+MODEL_PATH   = SAVE_DIR / "dnn_recommender.pt"
 
 
 # os.makedirs("saved_model", exist_ok=True)

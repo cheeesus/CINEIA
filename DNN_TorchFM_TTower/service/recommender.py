@@ -9,9 +9,8 @@
 
 from __future__ import annotations
 
-import functools
 import time
-from typing import List, Tuple
+from typing import Tuple
 
 from DNN_TorchFM_TTower.models.db import (
     get_user_view_count,
@@ -23,43 +22,45 @@ from DNN_TorchFM_TTower.models.recall.two_tower import load_model as _load_tower
 from DNN_TorchFM_TTower.models.ranking.infer_ranking import rank_candidates
 
 
-# --------------------------------------------------------------------------- #
-#                          全局缓存 —— 只加载一次                              #
-# --------------------------------------------------------------------------- #
-_TOWER_MODEL = functools.lru_cache(maxsize=1)(_load_tower)()   # type: ignore
+def _get_tower_model():
+    """
+    每次都动态加载 Two-Tower 模型，以保证使用最新的 vocab size。
+    """
+    return _load_tower()
 
 
-# core interface
-# 只改 recommend_movies_for_user 的返回值 & 末尾 CLI 打印
 def recommend_movies_for_user(user_id: int,
                               n_recall: int = 300,
-                              n_final:  int = 20) -> tuple[list[int], list[float], str]:
+                              n_final:  int = 20
+                              ) -> Tuple[list[int], list[float], str]:
     """
     返回 (movie_ids, scores, strategy)
-    strategy: 'cold' | 'warm' | 'warm+rank'
+      - strategy: 'cold' | 'warm' | 'warm+rank'
     """
-    # --- 1) 确保新用户在 users 表中有记录，否则 view_count 会继续返回 0 之外的值 ---
+
+    # 1) 确保新用户在 users 表中有记录
     if not fetchone_dict("SELECT 1 FROM users WHERE id=%s", (user_id,)):
         execute_sql(
             "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
             (user_id, f"api_{user_id}@demo.com", b"hash_placeholder"),
         )
 
-    # --- 2) 拿到观看历史数 ---
+    # 2) 获取用户历史观看次数
     view_cnt = get_user_view_count(user_id)
 
-    # -------- cold --------
+    # -------- 冷启动 --------
     if view_cnt == 0:
         mids = cold_start.recommend_cold_start(top_n=n_final)
         return mids, [None] * len(mids), "cold"
 
-    # -------- warm（Two-Tower）＋catch越界 fallback--------
+    # -------- 热启动 (Two-Tower) + fallback --------
+    recall_model = _get_tower_model()
     try:
         recall_ids, recall_scores = recommend_warm_start(
-            _TOWER_MODEL, user_id, top_n=n_recall
+            recall_model, user_id, top_n=n_recall
         )
     except IndexError:
-        # embedding 长度不足，新用户越界：退回 cold-start
+        # Embedding 越界，新用户/新电影尚未在模型中：fallback 到冷启动
         print(f"[recommender] user {user_id} embedding 越界，fallback cold-start")
         mids = cold_start.recommend_cold_start(top_n=n_final)
         return mids, [None] * len(mids), "cold"
@@ -68,15 +69,17 @@ def recommend_movies_for_user(user_id: int,
         mids = cold_start.recommend_cold_start(top_n=n_final)
         return mids, [None] * len(mids), "cold"
 
-    # -------- rank --------
+    # -------- DeepFM 精排 --------
     mids = rank_candidates(user_id, recall_ids, recall_scores, top_n=n_final)
     return mids, recall_scores[:n_final], "warm+rank"
 
 
-# CLI 测试保持，改为 JSON 打印
+# -------------------- CLI 测试 --------------------
 if __name__ == "__main__":
-    import json, datetime, argparse
-    from models.db import get_movie_titles
+    import json
+    import datetime
+    import argparse
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
 
     ap = argparse.ArgumentParser()
     ap.add_argument("user_id", type=int)
