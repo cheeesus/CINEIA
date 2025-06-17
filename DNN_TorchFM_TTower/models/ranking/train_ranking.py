@@ -40,7 +40,7 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     df["recall_score"] = 0.0
 
     sparse_cols = ["user_id", "movie_id", "genre_id", "pref_genre_id"]
-    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    dense_cols = ["recall_score", "vote_average", "popularity", "age", "is_favorite","user_watch_count", "user_fav_count"]
 
     print(f"[train_ranking] samples={len(df)}  pos:neg≈1:{neg_ratio}")
 
@@ -56,7 +56,7 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     model = DeepFM(
         field_dims,
         num_dense=len(dense_cols),
-        embed_dim=16,
+        embed_dim=32,
         mlp_dims=(128, 64),
         dropout=0.2
     )
