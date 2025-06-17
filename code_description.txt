@@ -509,27 +509,74 @@ def get_user_preferences(user_id: int) -> List[int]:
 import random
 from DNN_TorchFM_TTower.models.db import fetchall_dict
 
-def recommend_cold_start(top_n=10):
+def prepare_cold_start_features(user_genres, movies):
     """
-    针对无历史用户(冷启动)：先选一批高评分热门电影，再随机抽取 top_n。
-    示例：我们假设在 movies 表中有 vote_average, vote_count 字段。
+    Prepare features for cold-start recommendation.
+
+    Args:
+        user_genres: List of genres selected by the user.
+        movies: List of movie dictionaries with attributes.
+
+    Returns:
+        Torch tensor of features.
     """
-    query = """
-        SELECT id
-        FROM movies
-        WHERE vote_count > 0
-        ORDER BY vote_average DESC, vote_count DESC
-        LIMIT 50
-    """
-    rows = fetchall_dict(query)
-    if not rows:
-        return []
-    candidate_ids = [r["id"] for r in rows]
+    features = []
+    for movie in movies:
+        feature_vector = [
+            int(movie["genre_id"] in user_genres),  # Genre match
+            movie["vote_average"],  # Continuous feature
+            movie["vote_count"],    # Continuous feature
+        ]
+        features.append(feature_vector)
+    return torch.tensor(features, dtype=torch.float32)
     
-    # 从这 50 部评分最高的影片里随机抽 top_n
-    if len(candidate_ids) <= top_n:
-        return candidate_ids
-    return random.sample(candidate_ids, top_n)
+
+def recommend_cold_start(user_genres, movies, deepfm_model, top_n=10):
+    """
+    Recommend movies for a cold-start user using DeepFM.
+
+    Args:
+        user_genres: List of genres selected by the user.
+        movies: List of movie dictionaries with attributes.
+        deepfm_model: Trained DeepFM model.
+        top_n: Number of recommendations to return.
+
+    Returns:
+        List of recommended movie IDs.
+    """
+    features = prepare_cold_start_features(user_genres, movies)
+    movie_ids = [movie["id"] for movie in movies]
+
+    # Score using DeepFM
+    with torch.no_grad():
+        scores = deepfm_model(features).numpy()
+
+    # Rank and return top-n
+    ranked_indices = np.argsort(-scores)[:top_n]
+    return [movie_ids[i] for i in ranked_indices]
+
+
+# def recommend_cold_start(top_n=10):
+#     """
+#     针对无历史用户(冷启动)：先选一批高评分热门电影，再随机抽取 top_n。
+#     示例：我们假设在 movies 表中有 vote_average, vote_count 字段。
+#     """
+#     query = """
+#         SELECT id
+#         FROM movies
+#         WHERE vote_count > 0
+#         ORDER BY vote_average DESC, vote_count DESC
+#         LIMIT 50
+#     """
+#     rows = fetchall_dict(query)
+#     if not rows:
+#         return []
+#     candidate_ids = [r["id"] for r in rows]
+    
+#     # 从这 50 部评分最高的影片里随机抽 top_n
+#     if len(candidate_ids) <= top_n:
+#         return candidate_ids
+#     return random.sample(candidate_ids, top_n)
 
 
 ===== 文件: ./DNN_TorchFM_TTower/models/recall/train_incremental.py =====
@@ -636,6 +683,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from sklearn.metrics import accuracy_score, recall_score
 
 from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
@@ -792,6 +840,25 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
     print(f"[train_two_tower] Done，best val={best_val:.4f}")
 
 
+    # ===== 新增：在验证集上计算 Accuracy 和 Recall =====
+    model.eval()
+    all_true, all_pred = [], []
+    with torch.no_grad():
+        for u, m, y in val_loader:
+            # 同步到 model 使用的 device
+            u, m, y = u.to(device), m.to(device), y.to(device)
+            logits = model(u, m)
+            probs = torch.sigmoid(logits)
+            preds = (probs >= 0.5).float()
+
+            all_true.extend(y.cpu().numpy().tolist())
+            all_pred.extend(preds.cpu().numpy().tolist())
+
+    acc = accuracy_score(all_true, all_pred)
+    rec = recall_score(all_true, all_pred, zero_division=0)
+    print(f"[train_two_tower] Validation Accuracy: {acc * 100:.2f}%")
+    print(f"[train_two_tower] Validation Recall:   {rec * 100:.2f}%")
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
@@ -805,11 +872,8 @@ if __name__ == "__main__":
 ===== 文件: ./DNN_TorchFM_TTower/models/recall/two_tower.py =====
 """
 Two-Tower recall model inference logic
-
-把原先的 warm_start.py + infer.py 合并成一个文件，供 service 层调用：
-    from models.recall.two_tower import load_model, recommend_warm_start
+—— 在召回前根据用户在 user_preferences 表里的偏好 genre 过滤候选电影
 """
-
 import time
 from pathlib import Path
 from typing import List, Tuple
@@ -821,12 +885,15 @@ from DNN_TorchFM_TTower.models.db import (
     get_max_user_id,
     get_max_movie_id,
     get_all_movie_ids_with_language,
-    get_user_view_languages,
+    get_user_preferences,
+    fetchall_dict
 )
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 
 def load_model(model_path: str | None = None, *, embedding_dim: int = 32) -> TwoTowerMLPModel:
-    """加载 Two-Tower，并对“新用户 / 新电影”做安全扩容拷贝。"""
+    """
+    加载 Two-Tower 模型，并对“新用户 / 新电影”做安全扩容拷贝。
+    """
     if model_path is None:
         model_path = Path(__file__).resolve().parents[3] / "saved_model" / "dnn_recommender.pt"
     model_path = Path(model_path)
@@ -834,80 +901,149 @@ def load_model(model_path: str | None = None, *, embedding_dim: int = 32) -> Two
     # ── 1. 取得最新 vocab size ──────────────────────────────────────────
     max_u = get_max_user_id()
     max_m = get_max_movie_id()
-    model = TwoTowerMLPModel(max_u, max_m, embedding_dim=embedding_dim, hidden_dim=64)
+    model = TwoTowerMLPModel(max_u, max_m,
+                             embedding_dim=embedding_dim, hidden_dim=64)
 
-    # 如果还没有训练过，直接返回随机初始模型
+    # 如果还没有训练过，直接返回随机初始化的模型
     if not model_path.exists():
         return model.eval()
 
     # ── 2. 断点权重加载（带扩容） ────────────────────────────────────────
     state = torch.load(model_path, map_location="cpu")
 
-    # helper：把旧权重拷进新的 embedding，剩下的行保持随机初始化
     def _copy(old_w, new_w):
         rows = min(old_w.size(0), new_w.size(0))
         new_w[:rows].data.copy_(old_w[:rows])
 
+    # 扩容 embedding 并拷贝旧权重
     if "user_embedding.weight" in state:
         _copy(state["user_embedding.weight"], model.user_embedding.weight)
     if "movie_embedding.weight" in state:
         _copy(state["movie_embedding.weight"], model.movie_embedding.weight)
 
-    # 其余层形状相同，直接加载（strict=False 跳过刚才处理过的两个 key）
-    for k in ["user_embedding.weight", "movie_embedding.weight"]:
-        state.pop(k, None)
+    # 删除已处理的 key，后续用 strict=False 加载余下部分
+    for key in ("user_embedding.weight", "movie_embedding.weight"):
+        state.pop(key, None)
     model.load_state_dict(state, strict=False)
 
-    model.eval()
-    return model
+    return model.eval()
 
 
-def recommend_warm_start(model: TwoTowerMLPModel, user_id: int, top_n: int = 10) -> Tuple[List[int], List[float]]:
+def recommend_warm_start(
+    model: TwoTowerMLPModel,
+    user_id: int,
+    top_n: int = 10,
+    genre_weight: float = 0.7,  # Weight for preferred genres
+    diversity_ratio: float = 0.3  # Proportion of non-preferred genres
+) -> Tuple[List[int], List[float]]:
+    """
+    Recommend movies for a user using the Two-Tower model with balanced genre filtering.
+
+    Args:
+        model: TwoTowerMLPModel instance for inference.
+        user_id: ID of the user.
+        top_n: Number of recommendations to return.
+        genre_weight: Weight for preferred genres in scoring.
+        diversity_ratio: Proportion of non-preferred genres to include.
+
+    Returns:
+        Tuple of (movie_ids, scores).
+    """
     tic = time.time()
-    preferred_langs = get_user_view_languages(user_id)
-    all_movies = get_all_movie_ids_with_language()
-    if preferred_langs:
-        candidate_movies = [m for m, lang in all_movies if lang in preferred_langs]
+
+    # Fetch user's preferred genres
+    preferred_genres = get_user_preferences(user_id)
+
+    # Fetch all movies and their genres
+    all_movies_lang = get_all_movie_ids_with_language()
+
+    if preferred_genres:
+        # Movies matching preferred genres
+        rows = fetchall_dict(
+            "SELECT movie_id FROM movie_genre WHERE genre_id = ANY(%s)",
+            (preferred_genres,)
+        )
+        genre_movie_set = {r["movie_id"] for r in rows}
     else:
-        candidate_movies = [m for m, _ in all_movies]
+        genre_movie_set = set()
+
+    candidate_movies = [m for m, _ in all_movies_lang]
+    candidate_genre_movies = [m for m in candidate_movies if m in genre_movie_set]
+    non_genre_movies = [m for m in candidate_movies if m not in genre_movie_set]
+
     if not candidate_movies:
         return [], []
-    movie_tensor = torch.tensor(candidate_movies, dtype=torch.long)
-    user_tensor = torch.full((len(candidate_movies),), user_id, dtype=torch.long)
+
+    # Inference for preferred-genre movies
+    device = next(model.parameters()).device
+    movie_tensor = torch.tensor(candidate_genre_movies, dtype=torch.long, device=device)
+    user_tensor = torch.full((len(candidate_genre_movies),), user_id, dtype=torch.long, device=device)
+
     with torch.no_grad():
-        logits = model(user_tensor, movie_tensor)
-        scores = torch.sigmoid(logits).numpy().flatten()
-    top_idx = np.argsort(-scores)[:top_n]
-    top_movie_ids = np.array(candidate_movies)[top_idx]
-    top_scores = scores[top_idx]
-    print(f"[two_tower] Inference finished in {time.time() - tic:.2f}s")
-    return top_movie_ids.tolist(), top_scores.tolist()
+        genre_logits = model(user_tensor, movie_tensor)
+        genre_scores = torch.sigmoid(genre_logits).cpu().numpy()
+
+    # Inference for non-preferred-genre movies
+    movie_tensor_non_genre = torch.tensor(non_genre_movies, dtype=torch.long, device=device)
+    user_tensor_non_genre = torch.full((len(non_genre_movies),), user_id, dtype=torch.long, device=device)
+
+    with torch.no_grad():
+        non_genre_logits = model(user_tensor_non_genre, movie_tensor_non_genre)
+        non_genre_scores = torch.sigmoid(non_genre_logits).cpu().numpy()
+
+    # Combine and adjust scores
+    genre_adjusted_scores = genre_weight * genre_scores
+    non_genre_adjusted_scores = (1 - genre_weight) * non_genre_scores
+
+    # Rank within each group
+    top_genre_idx = np.argsort(-genre_adjusted_scores)[:int(top_n * (1 - diversity_ratio))]
+    top_non_genre_idx = np.argsort(-non_genre_adjusted_scores)[:int(top_n * diversity_ratio)]
+
+    # Collect final recommendations
+    top_genre_ids = np.array(candidate_genre_movies)[top_genre_idx].tolist()
+    top_non_genre_ids = np.array(non_genre_movies)[top_non_genre_idx].tolist()
+
+    # Merge the two pools
+    top_ids = top_genre_ids + top_non_genre_ids
+    top_scores = np.concatenate((genre_adjusted_scores[top_genre_idx], non_genre_adjusted_scores[top_non_genre_idx])).tolist()
+
+    print(f"[two_tower] Inference finished in {time.time() - tic:.2f}s | "
+          f"candidates: genre {len(candidate_genre_movies)}, non-genre {len(non_genre_movies)} → top {top_n}")
+    return top_ids, top_scores
+
+
 
 if __name__ == "__main__":
     import argparse
     from DNN_TorchFM_TTower.models.db import get_movie_titles
-    ap = argparse.ArgumentParser()
-    ap.add_argument("user_id", type=int)
-    ap.add_argument("--top_n", type=int, default=10)
-    args = ap.parse_args()
-    mdl = load_model()
-    mids, scs = recommend_warm_start(mdl, args.user_id, args.top_n)
-    title_map = get_movie_titles(mids)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("user_id", type=int)
+    parser.add_argument("--top_n", type=int, default=10)
+    args = parser.parse_args()
+
+    model = load_model()
+    mids, scs = recommend_warm_start(model, args.user_id, args.top_n)
+    titles = get_movie_titles(mids)
+
     print(f"\nTop {args.top_n} recommendations for user {args.user_id}:")
-    for idx, (mid, score) in enumerate(zip(mids, scs), start=1):
-        print(f"  {idx:02}. ID={mid:<6}  {title_map.get(mid, 'Unknown'):<40}  score={score:.4f}")
+    for i, (mid, score) in enumerate(zip(mids, scs), start=1):
+        print(f"  {i:02}. ID={mid:<6}  {titles.get(mid,'Unknown'):<40}  score={score:.4f}")
 
 
 ===== 文件: ./DNN_TorchFM_TTower/models/recall/__init__.py =====
 
 
 ===== 文件: ./DNN_TorchFM_TTower/models/ranking/train_ranking.py =====
+# 文件: models/ranking/train_ranking.py
 import os
 import argparse
+
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, recall_score
 from tqdm import tqdm
 
 from DNN_TorchFM_TTower.models.db import fetchone_dict
@@ -941,15 +1077,15 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     df["recall_score"] = 0.0
 
     sparse_cols = ["user_id", "movie_id", "genre_id", "pref_genre_id"]
-    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    dense_cols = ["recall_score", "vote_average", "popularity", "age", "is_favorite","user_watch_count", "user_fav_count"]
 
     print(f"[train_ranking] samples={len(df)}  pos:neg≈1:{neg_ratio}")
 
     # 划分训练/验证集
     tr_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
-    train_loader = DataLoader(_to_tensor(tr_df, sparse_cols, dense_cols), 
+    train_loader = DataLoader(_to_tensor(tr_df, sparse_cols, dense_cols),
                               batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(_to_tensor(val_df, sparse_cols, dense_cols),   
+    val_loader   = DataLoader(_to_tensor(val_df, sparse_cols, dense_cols),
                               batch_size=batch_size, shuffle=False)
 
     # 构建 DeepFM 模型
@@ -957,7 +1093,7 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     model = DeepFM(
         field_dims,
         num_dense=len(dense_cols),
-        embed_dim=16,
+        embed_dim=32,
         mlp_dims=(128, 64),
         dropout=0.2
     )
@@ -976,14 +1112,15 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
         for Xs, Xd, y in tqdm(train_loader, desc=f"Ep {ep}/{epochs}", ncols=80):
             Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
             optimizer.zero_grad()
-            loss = loss_fn(model(Xs, Xd), y)
+            logits = model(Xs, Xd)
+            loss   = loss_fn(logits, y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item() * y.size(0)
             count += y.size(0)
         print(f"  train_loss={total_loss/count:.4f}")
 
-        # 验证
+        # 验证（只打印 loss）
         model.eval()
         total_val, count_val = 0.0, 0
         with torch.no_grad():
@@ -998,6 +1135,25 @@ def main(epochs=3, batch_size=2048, neg_ratio=1):
     torch.save(model.cpu().state_dict(), MODEL_PATH)
     print("DeepFM saved →", MODEL_PATH)
 
+    # ===== 新增：在验证集上计算 Accuracy 和 Recall =====
+    model.eval()
+    all_true, all_pred = [], []
+    with torch.no_grad():
+        for Xs, Xd, y in val_loader:
+            # 同步到当前 device
+            Xs, Xd, y = Xs.to(device), Xd.to(device), y.to(device)
+            logits = model(Xs, Xd)
+            probs  = torch.sigmoid(logits)
+            preds  = (probs >= 0.5).float()
+
+            all_true.extend(y.cpu().numpy().tolist())
+            all_pred.extend(preds.cpu().numpy().tolist())
+
+    acc = accuracy_score(all_true, all_pred)
+    rec = recall_score(all_true, all_pred, zero_division=0)
+    print(f"[train_ranking] Validation Accuracy: {acc * 100:.2f}%")
+    print(f"[train_ranking] Validation Recall:   {rec * 100:.2f}%")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs",    type=int, default=3)
@@ -1005,6 +1161,7 @@ if __name__ == "__main__":
     parser.add_argument("--neg_ratio", type=int, default=1)
     args = parser.parse_args()
     main(args.epochs, args.batch, args.neg_ratio)
+
 
 ===== 文件: ./DNN_TorchFM_TTower/models/ranking/torchfm_ranker.py =====
 """
@@ -1092,7 +1249,13 @@ def _get_user_features() -> pd.DataFrame:
     rows = fetchall_dict("SELECT id AS user_id, COALESCE(age, 0) AS age FROM users")
     return pd.DataFrame(rows)
 
+
 def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
+    from collections import defaultdict
+    import pandas as pd
+    import random
+
+    # 正样本：用户观看历史
     pos_rows = fetchall_dict("SELECT user_id, movie_id FROM view_history")
     if not pos_rows:
         return pd.DataFrame()
@@ -1100,12 +1263,12 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
     pos_df = pd.DataFrame(pos_rows)
     pos_df["label"] = 1
 
+    # 所有电影 & 构造负样本（未看过的）
     all_movies = {r["movie_id"] for r in fetchall_dict("SELECT id AS movie_id FROM movies")}
-    user_pos  = defaultdict(set)
+    user_pos = defaultdict(set)
     for r in pos_rows:
         user_pos[r["user_id"]].add(r["movie_id"])
 
-    import random
     neg_records = []
     for u, watched in user_pos.items():
         cand = list(all_movies - watched)
@@ -1116,53 +1279,115 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
 
     data_df = pd.concat([pos_df, neg_df], ignore_index=True)
 
+    # 加载电影特征 & 用户特征
     movies_df = _get_movie_features()
     users_df  = _get_user_features()
 
     df = data_df.merge(movies_df, on="movie_id", how="left") \
                 .merge(users_df,  on="user_id", how="left")
 
-    # <-- NEW: attach the user's chosen genre -->
+    # 加入用户偏好题材（pref_genre_id）
+    pref_rows = fetchall_dict("SELECT user_id, genre_id AS pref_genre_id FROM user_preferences")
+    pref_df = pd.DataFrame(pref_rows)
+    df = df.merge(pref_df, on="user_id", how="left")
+    df["pref_genre_id"].fillna(0, inplace=True)
+    df["pref_genre_id"] = df["pref_genre_id"].astype(int)
+
+    # ===== 新增：是否标记为收藏（favorites）=====
+    fav_rows = fetchall_dict("""
+        SELECT l.user_id, lm.movie_id
+        FROM lists l
+        JOIN list_movies lm ON l.id = lm.list_id
+        WHERE l.name = 'favorites'
+    """)
+    fav_df = pd.DataFrame(fav_rows)
+    fav_df["is_favorite"] = 1
+
+    df = df.merge(fav_df, on=["user_id", "movie_id"], how="left")
+    df["is_favorite"].fillna(0, inplace=True)
+    df["is_favorite"] = df["is_favorite"].astype(int)
+
+    # ===== 新增：用户历史行为统计特征 =====
+    watch_count = pos_df.groupby("user_id")["movie_id"].count().reset_index()
+    watch_count.columns = ["user_id", "user_watch_count"]
+
+    fav_count = fav_df.groupby("user_id")["movie_id"].count().reset_index()
+    fav_count.columns = ["user_id", "user_fav_count"]
+
+    df = df.merge(watch_count, on="user_id", how="left")
+    df = df.merge(fav_count, on="user_id", how="left")
+
+    df["user_watch_count"].fillna(0, inplace=True)
+    df["user_fav_count"].fillna(0, inplace=True)
+
+    # 最后统一填充所有空值
+    df.fillna(0, inplace=True)
+    return df
+
+
+def build_infer_df(user_id: int, candidate_movies: list[int], recall_scores: list[float]) -> pd.DataFrame:
+    """构造用于排序阶段的输入 DataFrame"""
+    rows = [{"user_id": user_id, "movie_id": mid, "recall_score": score} 
+            for mid, score in zip(candidate_movies, recall_scores)]
+    df = pd.DataFrame(rows)
+
+    # 加载电影特征 & 用户特征
+    movies_df = _get_movie_features()
+    users_df  = _get_user_features()
+
+    df = df.merge(movies_df, on="movie_id", how="left") \
+           .merge(users_df,  on="user_id", how="left")
+
+    # 用户偏好题材
     pref_rows = fetchall_dict("SELECT user_id, genre_id AS pref_genre_id FROM user_preferences")
     pref_df   = pd.DataFrame(pref_rows)
     df = df.merge(pref_df, on="user_id", how="left")
     df["pref_genre_id"].fillna(0, inplace=True)
     df["pref_genre_id"] = df["pref_genre_id"].astype(int)
 
+    # 是否收藏该电影
+    fav_rows = fetchall_dict("""
+        SELECT l.user_id, lm.movie_id
+        FROM lists l
+        JOIN list_movies lm ON l.id = lm.list_id
+        WHERE l.name = 'favorites'
+    """)
+    fav_df = pd.DataFrame(fav_rows)
+    fav_df["is_favorite"] = 1
+    df = df.merge(fav_df, on=["user_id", "movie_id"], how="left")
+    df["is_favorite"].fillna(0, inplace=True)
+    df["is_favorite"] = df["is_favorite"].astype(int)
+
+    # 用户行为统计
+    watch_count = fetchall_dict("SELECT user_id, COUNT(*) AS user_watch_count FROM view_history GROUP BY user_id")
+    fav_count   = fetchall_dict("""
+        SELECT l.user_id, COUNT(*) AS user_fav_count
+        FROM lists l JOIN list_movies lm ON l.id = lm.list_id
+        WHERE l.name = 'favorites' GROUP BY l.user_id
+    """)
+    watch_df = pd.DataFrame(watch_count)
+    fav_df   = pd.DataFrame(fav_count)
+    df = df.merge(watch_df, on="user_id", how="left")
+    df = df.merge(fav_df,   on="user_id", how="left")
+
+    df["user_watch_count"].fillna(0, inplace=True)
+    df["user_fav_count"].fillna(0, inplace=True)
+
     df.fillna(0, inplace=True)
     return df
 
-def build_infer_df(
-    user_id: int,
-    movie_ids: List[int],
-    recall_scores: List[float]
-) -> pd.DataFrame:
-    movies_df = _get_movie_features()
-    users_df  = _get_user_features()
-
-    infer_df = pd.DataFrame({
-        "user_id":      user_id,
-        "movie_id":     movie_ids,
-        "recall_score": recall_scores,
-    })
-
-    # <-- NEW: single preference for inference -->
-    pref_rows = fetchall_dict(
-        "SELECT genre_id AS pref_genre_id FROM user_preferences WHERE user_id = %s",
-        (user_id,)
-    )
-    if pref_rows:
-        pref_id = pref_rows[0]["pref_genre_id"]
-    else:
-        pref_id = 0
-    infer_df["pref_genre_id"] = pref_id
-
-    infer_df = infer_df.merge(movies_df, on="movie_id", how="left") \
-                       .merge(users_df,  on="user_id",  how="left")
-
-    infer_df.fillna(0, inplace=True)
-    return infer_df
-
+def fetch_user_favorite_movies() -> dict[int, set[int]]:
+    """返回字典 user_id → 他们收藏的 movie_id 集合"""
+    rows = fetchall_dict("""
+        SELECT lm.movie_id, l.user_id
+        FROM list_movies lm
+        JOIN lists l ON lm.list_id = l.id
+        WHERE l.name = 'favorites'
+    """)
+    fav_map = {}
+    for r in rows:
+        fav_map.setdefault(r["user_id"], set()).add(r["movie_id"])
+    return fav_map
 
 ===== 文件: ./DNN_TorchFM_TTower/models/ranking/__init__.py =====
 
@@ -1296,7 +1521,7 @@ def _vocab_sizes():
     return [mu + 2, mm + 2, mg + 2, mg + 2]
 
 def _load_model(field_dims, num_dense):
-    model = DeepFM(field_dims, num_dense)
+    model = DeepFM(field_dims, num_dense, embed_dim=32)
     if not MODEL_PATH.exists():
         return None
 
@@ -1304,9 +1529,17 @@ def _load_model(field_dims, num_dense):
 
     def _safe_copy(param_name, new_weight):
         if param_name in state_old:
-            old_w = state_old[param_name]
-            rows  = min(old_w.size(0), new_weight.size(0))
-            new_weight[:rows].data.copy_(old_w[:rows])
+            old_weight = state_old[param_name]
+            if old_weight.size() == new_weight.size():
+                new_weight.data.copy_(old_weight)
+            else:
+                print(f"Mismatch in {param_name}: old {old_weight.size()}, new {new_weight.size()}")
+                rows, cols = old_weight.size()
+                new_rows, new_cols = new_weight.size()
+                min_rows = min(rows, new_rows)
+                min_cols = min(cols, new_cols)
+                new_weight[:min_rows, :min_cols].data.copy_(old_weight[:min_rows, :min_cols])
+
 
     _safe_copy("linear_sparse.fc.weight",    model.linear_sparse.fc.weight)
     _safe_copy("embedding.embedding.weight", model.embedding.embedding.weight)
@@ -1324,7 +1557,7 @@ def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
 
     df = build_infer_df(user_id, movie_ids, recall_scores)
     sparse_cols = ["user_id", "movie_id", "genre_id", "pref_genre_id"]
-    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    dense_cols = ["recall_score", "vote_average", "popularity", "age", "is_favorite", "user_watch_count", "user_fav_count"]
 
     field_dims = _vocab_sizes()
     model      = _load_model(field_dims, num_dense=len(dense_cols))

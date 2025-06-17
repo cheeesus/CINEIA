@@ -60,55 +60,85 @@ def load_model(model_path: str | None = None, *, embedding_dim: int = 32) -> Two
 def recommend_warm_start(
     model: TwoTowerMLPModel,
     user_id: int,
-    top_n: int = 10
+    top_n: int = 10,
+    genre_weight: float = 0.7,  # Weight for preferred genres
+    diversity_ratio: float = 0.3  # Proportion of non-preferred genres
 ) -> Tuple[List[int], List[float]]:
     """
-    基于 Two-Tower 对老用户做召回，并对召回候选集做 genre 过滤。
+    Recommend movies for a user using the Two-Tower model with balanced genre filtering.
 
-    返回 (movie_ids, scores) 两个长度为 top_n 的列表。
+    Args:
+        model: TwoTowerMLPModel instance for inference.
+        user_id: ID of the user.
+        top_n: Number of recommendations to return.
+        genre_weight: Weight for preferred genres in scoring.
+        diversity_ratio: Proportion of non-preferred genres to include.
+
+    Returns:
+        Tuple of (movie_ids, scores).
     """
     tic = time.time()
 
-    # 1) 从 user_preferences 表里拿用户偏好的 genre 列表
-    preferred_genres = get_user_preferences(user_id)  # e.g. [12, 5, 20]
+    # Fetch user's preferred genres
+    preferred_genres = get_user_preferences(user_id)
 
-    # 2) 拿到所有电影及其语言（language 信息不影响 genre 过滤）
-    all_movies_lang = get_all_movie_ids_with_language()  # [(movie_id, lang), ...]
+    # Fetch all movies and their genres
+    all_movies_lang = get_all_movie_ids_with_language()
 
-    # 3) 如果有偏好 genre，则先在 movie_genre 表里把这些 genre 对应的 movie_id 拉出来
     if preferred_genres:
+        # Movies matching preferred genres
         rows = fetchall_dict(
             "SELECT movie_id FROM movie_genre WHERE genre_id = ANY(%s)",
             (preferred_genres,)
         )
         genre_movie_set = {r["movie_id"] for r in rows}
-        # 只保留这些 movie_id
-        candidate_movies = [m for m, _ in all_movies_lang if m in genre_movie_set]
     else:
-        # 无显式偏好时全量召回
-        candidate_movies = [m for m, _ in all_movies_lang]
+        genre_movie_set = set()
+
+    candidate_movies = [m for m, _ in all_movies_lang]
+    candidate_genre_movies = [m for m in candidate_movies if m in genre_movie_set]
+    non_genre_movies = [m for m in candidate_movies if m not in genre_movie_set]
 
     if not candidate_movies:
         return [], []
 
-    # 4) Two-Tower 推理：批量计算用户对所有候选的打分
+    # Inference for preferred-genre movies
     device = next(model.parameters()).device
-    movie_tensor = torch.tensor(candidate_movies, dtype=torch.long, device=device)
-    user_tensor  = torch.full((len(candidate_movies),), user_id,
-                              dtype=torch.long, device=device)
+    movie_tensor = torch.tensor(candidate_genre_movies, dtype=torch.long, device=device)
+    user_tensor = torch.full((len(candidate_genre_movies),), user_id, dtype=torch.long, device=device)
 
     with torch.no_grad():
-        logits = model(user_tensor, movie_tensor)
-        scores = torch.sigmoid(logits).cpu().numpy()
+        genre_logits = model(user_tensor, movie_tensor)
+        genre_scores = torch.sigmoid(genre_logits).cpu().numpy()
 
-    # 5) 根据得分排序并截断
-    top_idx = np.argsort(-scores)[:top_n]
-    top_ids = np.array(candidate_movies)[top_idx].tolist()
-    top_scores = scores[top_idx].tolist()
+    # Inference for non-preferred-genre movies
+    movie_tensor_non_genre = torch.tensor(non_genre_movies, dtype=torch.long, device=device)
+    user_tensor_non_genre = torch.full((len(non_genre_movies),), user_id, dtype=torch.long, device=device)
+
+    with torch.no_grad():
+        non_genre_logits = model(user_tensor_non_genre, movie_tensor_non_genre)
+        non_genre_scores = torch.sigmoid(non_genre_logits).cpu().numpy()
+
+    # Combine and adjust scores
+    genre_adjusted_scores = genre_weight * genre_scores
+    non_genre_adjusted_scores = (1 - genre_weight) * non_genre_scores
+
+    # Rank within each group
+    top_genre_idx = np.argsort(-genre_adjusted_scores)[:int(top_n * (1 - diversity_ratio))]
+    top_non_genre_idx = np.argsort(-non_genre_adjusted_scores)[:int(top_n * diversity_ratio)]
+
+    # Collect final recommendations
+    top_genre_ids = np.array(candidate_genre_movies)[top_genre_idx].tolist()
+    top_non_genre_ids = np.array(non_genre_movies)[top_non_genre_idx].tolist()
+
+    # Merge the two pools
+    top_ids = top_genre_ids + top_non_genre_ids
+    top_scores = np.concatenate((genre_adjusted_scores[top_genre_idx], non_genre_adjusted_scores[top_non_genre_idx])).tolist()
 
     print(f"[two_tower] Inference finished in {time.time() - tic:.2f}s | "
-          f"candidates after genre filter: {len(candidate_movies)} → top {top_n}")
+          f"candidates: genre {len(candidate_genre_movies)}, non-genre {len(non_genre_movies)} → top {top_n}")
     return top_ids, top_scores
+
 
 
 if __name__ == "__main__":

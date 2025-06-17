@@ -18,7 +18,7 @@ def _vocab_sizes():
     return [mu + 2, mm + 2, mg + 2, mg + 2]
 
 def _load_model(field_dims, num_dense):
-    model = DeepFM(field_dims, num_dense)
+    model = DeepFM(field_dims, num_dense, embed_dim=32)
     if not MODEL_PATH.exists():
         return None
 
@@ -26,9 +26,17 @@ def _load_model(field_dims, num_dense):
 
     def _safe_copy(param_name, new_weight):
         if param_name in state_old:
-            old_w = state_old[param_name]
-            rows  = min(old_w.size(0), new_weight.size(0))
-            new_weight[:rows].data.copy_(old_w[:rows])
+            old_weight = state_old[param_name]
+            if old_weight.size() == new_weight.size():
+                new_weight.data.copy_(old_weight)
+            else:
+                print(f"Mismatch in {param_name}: old {old_weight.size()}, new {new_weight.size()}")
+                rows, cols = old_weight.size()
+                new_rows, new_cols = new_weight.size()
+                min_rows = min(rows, new_rows)
+                min_cols = min(cols, new_cols)
+                new_weight[:min_rows, :min_cols].data.copy_(old_weight[:min_rows, :min_cols])
+
 
     _safe_copy("linear_sparse.fc.weight",    model.linear_sparse.fc.weight)
     _safe_copy("embedding.embedding.weight", model.embedding.embedding.weight)
@@ -46,7 +54,7 @@ def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
 
     df = build_infer_df(user_id, movie_ids, recall_scores)
     sparse_cols = ["user_id", "movie_id", "genre_id", "pref_genre_id"]
-    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    dense_cols = ["recall_score", "vote_average", "popularity", "age", "is_favorite", "user_watch_count", "user_fav_count"]
 
     field_dims = _vocab_sizes()
     model      = _load_model(field_dims, num_dense=len(dense_cols))

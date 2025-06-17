@@ -17,7 +17,7 @@ SECRET_KEY=
 # I recommend to use python 3.10.11 as basic env
 cd CINEIA
 py -3.10 -m venv env_rec
-env_rec/Scripts/activate 
+env_rec/Scripts/activate   
 ```
 
 2 · Install Python dependencies

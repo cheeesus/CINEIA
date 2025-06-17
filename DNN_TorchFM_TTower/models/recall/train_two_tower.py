@@ -23,6 +23,9 @@ from sklearn.metrics import accuracy_score, recall_score
 from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 from DNN_TorchFM_TTower.models.pytorch_model import TwoTowerMLPModel
 
+
+
+
 # ---------------------------------------------------------------------------
 #                     固定 saved_model 目录到包根下                           #
 # ---------------------------------------------------------------------------
@@ -123,7 +126,7 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
         print("[train_two_tower] ❌ 训练集为空")
         return
 
-    print(f"[train_two_tower] 样本 {len(df)} | 用户 {df['user_id'].nunique()} | 电影 {df['movie_id'].nunique()}")
+    print(f"[train_two_tower] samples {len(df)} | user {df['user_id'].nunique()} | movie {df['movie_id'].nunique()}")
 
     train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
     train_loader = DataLoader(RecommendationDataset(train_df),
@@ -141,6 +144,8 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
     best_val = float("inf")
+    train_losses, val_losses = [], []  # Added to store losses
+
     for ep in range(1, epochs + 1):
         ep_start = time.time()
         model.train()
@@ -155,8 +160,9 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
             tloss.append(loss.item())
 
         avg_t = np.mean(tloss)
+        train_losses.append(avg_t)  # Log training loss
 
-        # ---------- 验证 ----------
+        # Validation
         model.eval()
         vloss = []
         with torch.no_grad():
@@ -164,6 +170,7 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
                 u, m, y = u.to(device), m.to(device), y.to(device)
                 vloss.append(criterion(model(u, m), y).item())
         avg_v = np.mean(vloss)
+        val_losses.append(avg_v)  # Log validation loss
 
         print(f"[Ep {ep:02}] train={avg_t:.4f}  val={avg_v:.4f}  time={time.time()-ep_start:.1f}s")
 
@@ -174,7 +181,19 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
 
     print(f"[train_two_tower] Done，best val={best_val:.4f}")
 
-
+    # Added: Plotting
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, epochs + 1), train_losses, label='Train Loss')
+    plt.plot(range(1, epochs + 1), val_losses, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Two-Tower Model Training')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    # Save the plot as an image file
+    plt.savefig('training_plot.png', dpi=300)
     # ===== 新增：在验证集上计算 Accuracy 和 Recall =====
     model.eval()
     all_true, all_pred = [], []
@@ -191,8 +210,29 @@ def main(epochs: int = 3, batch_size: int = 128, neg_ratio: int = 1):
 
     acc = accuracy_score(all_true, all_pred)
     rec = recall_score(all_true, all_pred, zero_division=0)
-    print(f"[train_two_tower] Validation Accuracy: {acc * 100:.2f}%")
-    print(f"[train_two_tower] Validation Recall:   {rec * 100:.2f}%")
+    # print("\nTwo-Tower Model Evaluation Summary")
+    # print(f"• Validation Set: 20% of the full training data")
+    # print(f"• Final Validation Loss: {total_val/count_val:.4f}")
+    # print(f"\nThe error between the model's prediction and the true label on new, unseen data (the validation set)")
+    # print(f"• Accuracy: {acc * 100:.2f}% — Measures how often the model correctly classifies preferences.")
+    # print(f"\n Of all predictions, the proportion of the total number of samples in which the predicted result is consistent with the true result")
+
+    # print(f"• Recall:   {rec * 100:.2f}% — Measures how many of the true positives were correctly predicted.")
+    # print(f"\nwhich means all user's liked movies that were successfully predicted by the model")
+
+
+    print("\n Two-Tower Model Evaluation Summary")
+    print(f"• Validation Set: 20% of the full training data")
+    print(f"• Final Validation Loss: {avg_v:.4f}")
+    print("  ↪︎ Measures the average prediction error (binary cross-entropy) on unseen validation samples.")
+
+    print(f"• Accuracy: {acc * 100:.2f}% — Percentage of correct predictions on 80% samples.")
+    print("  ↪︎ Accuracy = (True Positives + True Negatives) / Total Samples")
+    print("  ↪︎ Reflects how often the model correctly classifies whether a user would like a movie.")
+
+    print(f"• Recall:   {rec * 100:.2f}% — Percentage of true positives correctly predicted.")
+    print("  ↪︎ Recall = True Positives / (True Positives + False Negatives)")
+    print("  ↪︎ Indicates how well the model captures movies the user truly liked.")
 
 if __name__ == "__main__":
     import argparse

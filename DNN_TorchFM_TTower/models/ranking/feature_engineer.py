@@ -111,9 +111,10 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
     return df
 
 
-def build_infer_df(user_id: int, candidate_movies: list[int]) -> pd.DataFrame:
+def build_infer_df(user_id: int, candidate_movies: list[int], recall_scores: list[float]) -> pd.DataFrame:
     """构造用于排序阶段的输入 DataFrame"""
-    rows = [{"user_id": user_id, "movie_id": mid} for mid in candidate_movies]
+    rows = [{"user_id": user_id, "movie_id": mid, "recall_score": score} 
+            for mid, score in zip(candidate_movies, recall_scores)]
     df = pd.DataFrame(rows)
 
     # 加载电影特征 & 用户特征
