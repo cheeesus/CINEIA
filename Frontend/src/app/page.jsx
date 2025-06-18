@@ -12,7 +12,7 @@ export default function Home() {
 
   // ✅ 调试：打印 API 地址确认是否读取了 .env.local
   useEffect(() => {
-    console.log("🔍 NEXT_PUBLIC_API_BASE =", process.env.NEXT_PUBLIC_API_BASE);
+    console.log("NEXT_PUBLIC_API_URL =", process.env.NEXT_PUBLIC_API_URL);
   }, []);
 
   return (
