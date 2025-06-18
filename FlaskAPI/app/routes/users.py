@@ -75,10 +75,23 @@ def get_user_details(user_id):
         print(f"An error occurred: {e}")
         return jsonify({"message": "An internal server error occurred."}), 500
 
+@users_bp.route('/<int:user_id>/genres', methods=['GET'])
+def get_user_genres(user_id: int): 
+    with g.db.cursor() as cursor:
+        cursor.execute("""
+                SELECT up.genre_id, g.name AS genre_name
+                FROM user_preferences up
+                JOIN genres g ON up.genre_id = g.id
+                WHERE up.user_id = %s
+            """, (user_id,))
+        preferred_genres = cursor.fetchall()
+
+        return jsonify({"preferred_genres": preferred_genres}), 200
+
 
 @users_bp.route('/<int:user_id>/genres', methods=['PUT'])
 @token_required
-def update_preferred_genres(user_id):
+def update_preferred_genres(user_id: int):
 
     data = request.get_json()
     preferred_genres = data.get('preferred_genres')

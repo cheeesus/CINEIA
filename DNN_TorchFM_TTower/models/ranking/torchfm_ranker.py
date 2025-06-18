@@ -1,7 +1,5 @@
-# DNN_TorchFM_TTower\models\ranking\torchfm_ranker.py
 """
-torch-fm 版 DeepFM 精排模型封装
-可被 train_ranking / infer_ranking 调用
+torchfm_ranker.py
 """
 
 from pathlib import Path
@@ -33,11 +31,15 @@ def save_model(model: torch.nn.Module) -> None:
 
 def load_model(field_dims: Sequence[int]):
     """
-    若模型文件存在则加载并返回 eval() 后模型，否则返回 None
+    若模型文件存在则加载并返回 eval() 后模型，否则返回 None。
+
+    当数据库中新增了用户或电影时，只恢复已有的行，新增加的 embedding 行保持随机初始化。
     """
     if MODEL_PATH.exists():
+        # 1) 构建一个按最新 field_dims 大小初始化的网络
         m = create_model(field_dims)
-        m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
+        # 2) 只恢复已训练好的权重行，strict=False 保留了新加行的随机初始化
+        m.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"), strict=False)
         m.eval()
         return m
     return None

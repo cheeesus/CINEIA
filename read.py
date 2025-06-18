@@ -1,7 +1,7 @@
 import os
 
 # 设置目标目录
-target_dir = r"/data/synthese/CINEIA"
+target_dir = r"./DNN_TorchFM_TTower"
 
 # 设置输出文件路径
 output_file = os.path.join(os.getcwd(), "code_description.txt")

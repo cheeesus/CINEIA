@@ -3,6 +3,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from collections import Counter
 from DNN_TorchFM_TTower.models.config import DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+from typing import List  # <-- 新增
 
 def get_connection():
     return psycopg2.connect(
@@ -91,3 +92,11 @@ def execute_sql(query, params=None):
         with conn.cursor() as cur:
             cur.execute(query, params)
             conn.commit()
+
+def get_user_preferences(user_id: int) -> List[int]:
+    """
+    Returns a list of genre IDs the user has selected in their profile.
+    """
+    query = "SELECT genre_id FROM user_preferences WHERE user_id = %s"
+    rows = fetchall_dict(query, (user_id,))
+    return [r["genre_id"] for r in rows]

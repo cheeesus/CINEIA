@@ -9,18 +9,11 @@ def create_app():
     app = Flask(__name__)
     app.config.from_pyfile('config.py')
     
-    # Enable CORS for all routes
-    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000"]}}, supports_credentials=True)
-    # CORS(app, supports_credentials=True)
-    # CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
-    
-    # init db connection
-    db_connect(app)
+    # Enable CORS for specific origins
+    CORS(app, resources={r"/api/*": {"origins": ["http://45.149.207.13:3100"]}}, supports_credentials=True)
 
-    # register blueprints
+    # Initialize other components
+    db_connect(app)
     register_routes(app)
 
-
     return app
-
-

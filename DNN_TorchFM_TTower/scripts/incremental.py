@@ -1,88 +1,57 @@
-#!/usr/bin/env python3
-"""
-/scripts/incremental.py
-Interactive CLI demo:
-1. 如果用户不存在则自动插入 users 表
-2. 冷启动推荐 Top-K 让你选择想看的片
-3. 把选择写入 view_history
-4. 触发一次增量训练（可选）
-5. 走 Warm Start + 精排，再推荐下一批
-6. 支持循环，直到用户输入 q 退出
-"""
+import numpy as np
+import torch
+from pathlib import Path
 
-import readline  # 为了 ↑↓ 历史
-from models.db import (
-    fetchone_dict, execute_sql,
-    get_movie_titles, get_user_view_count
-)
-from DNN_TorchFM_TTower.models.recall.cold_start import recommend_cold_start
-from DNN_TorchFM_TTower.models.recall.two_tower import load_model as load_recall_model
-from DNN_TorchFM_TTower.models.recall.two_tower import recommend_warm_start
-from DNN_TorchFM_TTower.models.ranking.infer_ranking import rank_candidates
-from DNN_TorchFM_TTower.models.recall.train_incremental import incremental_train
+from DNN_TorchFM_TTower.models.db import fetchone_dict
+from DNN_TorchFM_TTower.models.ranking.feature_engineer import build_infer_df
+from DNN_TorchFM_TTower.models.ranking.custom_deepfm import DeepFM
 
-RECALL_MODEL = load_recall_model()
-USER_ID = int(input("请输入用户 ID（新用户填一个从未用过的数字）：").strip())
+BASE_DIR = Path(__file__).resolve().parents[3]
+MODEL_PATH = BASE_DIR / "saved_model" / "deepfm_ranker.pt"
 
-def ensure_user(uid):
-    if not fetchone_dict("SELECT 1 FROM users WHERE id=%s", (uid,)):
-        execute_sql(
-            "INSERT INTO users (id, email, password_hash) VALUES (%s, %s, %s)",
-            (uid, f"cli_{uid}@demo.com", "hash_placeholder")
-        )
-        print(f"✅ 已创建新用户 {uid}")
+def _vocab_sizes():
+    mu = fetchone_dict("SELECT MAX(id) AS m FROM users")["m"] or 0
+    mm = fetchone_dict("SELECT MAX(id) AS m FROM movies")["m"] or 0
+    mg = fetchone_dict("SELECT MAX(id) AS m FROM genres")["m"] or 0
+    return [mu + 2, mm + 2, mg + 2]
 
-def insert_views(uid, movie_ids):
-    for mid in movie_ids:
-        execute_sql("INSERT INTO view_history (user_id, movie_id) VALUES (%s, %s)", (uid, mid))
+def _load_model(field_dims, num_dense):
+    model = DeepFM(field_dims, num_dense)
+    if MODEL_PATH.exists():
+        state = torch.load(MODEL_PATH, map_location="cpu")
+        model.load_state_dict(state, strict=False)
+        model.eval()
+        return model
+    return None
 
-def choose_movies(candidates, title_map):
-    print("\n请在下面输入想看的电影编号，用空格分隔（回车结束，q 返回退出）：")
-    for i, mid in enumerate(candidates, 1):
-        print(f"[{i}] {title_map.get(mid, 'Unknown')}")
-    while True:
-        raw = input("你的选择: ").strip()
-        if raw.lower() in {"q", "quit"}:
-            return None
-        try:
-            idxs = [int(s) for s in raw.split()]
-            chosen = [candidates[i-1] for i in idxs if 1 <= i <= len(candidates)]
-            return chosen
-        except ValueError:
-            print("❌ 输入格式错误，请重新输入")
-
-def main_loop():
-    ensure_user(USER_ID)
-
-    while True:
-        watch_cnt = get_user_view_count(USER_ID)
-        print(f"\n=== 当前观影次数: {watch_cnt} ===")
-
-        if watch_cnt == 0:
-            # ---- Cold Start ----
-            rec_ids = recommend_cold_start(top_n=10)
-            phase = "冷启动"
-        else:
-            # ---- Recall + Ranking ----
-            rec_ids, recall_scores = recommend_warm_start(RECALL_MODEL, USER_ID, top_n=300)
-            rec_ids = rank_candidates(USER_ID, rec_ids, recall_scores, top_n=10)
-            phase = "热启动 (召回+精排)"
-
-        title_map = get_movie_titles(rec_ids)
-        print(f"\n【{phase}】为你推荐:")
-        for i, mid in enumerate(rec_ids, 1):
-            print(f"  {i}. {title_map.get(mid, 'Unknown')} (MovieID={mid})")
-
-        chosen = choose_movies(rec_ids, title_map)
-        if chosen is None:
-            print("👋 再见！")
-            break
-
-        insert_views(USER_ID, chosen)
-        print(f"✅ 已记录 {len(chosen)} 部影片观看历史。")
-
-        # 每次循环小规模增量训练一下（真实线上可异步 / 定时）
-        incremental_train(neg_ratio=1, epochs=1)
+def rank_candidates(user_id, movie_ids, recall_scores, top_n=10):
+    if not movie_ids:
+        return []
+    df = build_infer_df(user_id, movie_ids, recall_scores)
+    sparse_cols = ["user_id", "movie_id", "genre_id"]
+    dense_cols  = ["recall_score", "vote_average", "popularity", "age"]
+    field_dims  = _vocab_sizes()
+    model = _load_model(field_dims, num_dense=len(dense_cols))
+    if model is None:
+        idx = np.argsort(-np.array(recall_scores))[:top_n]
+        return list(np.array(movie_ids)[idx])
+    xs = torch.tensor(df[sparse_cols].values, dtype=torch.long)
+    xd = torch.tensor(df[dense_cols].values, dtype=torch.float32)
+    with torch.no_grad():
+        scores = torch.sigmoid(model(xs, xd)).numpy()
+    df["score"] = scores
+    return df.sort_values("score", ascending=False).head(top_n)["movie_id"].tolist()
 
 if __name__ == "__main__":
-    main_loop()
+    import argparse
+    from DNN_TorchFM_TTower.models.recall.two_tower import load_model, recommend_warm_start
+    from DNN_TorchFM_TTower.models.db import get_movie_titles
+    parser = argparse.ArgumentParser()
+    parser.add_argument("user_id", type=int)
+    args = parser.parse_args()
+    tower = load_model()
+    cand_ids, cand_scores = recommend_warm_start(tower, args.user_id, top_n=300)
+    ranked = rank_candidates(args.user_id, cand_ids, cand_scores, top_n=10)
+    titles = get_movie_titles(ranked)
+    for i, mid in enumerate(ranked, 1):
+        print(f"{i:02}. {titles.get(mid,'Unknown')} (ID={mid})")
