@@ -7,10 +7,10 @@ import styles from "@/styles/login.module.css";
 import Header from "@/components/Header";
 
 const genresList = [
-  "Western", "Drama", "Action", "Crime", "Mystery", "Thriller", "Horror",
-  "Adventure", "Science Fiction", "Romance", "Comedy", "War", "Fantasy",
-  "Animation", "Family", "History", "TV Movie", "Music", "Documentary"
-];
+  "Adventure", "Animation", "Children", "Comedy", "Fantasy",
+  "Romance", "Drama", "Action", "Crime", "Thriller", "Horror",
+  "Mystery", "Sci-Fi", "IMAX", "Documentary", "War", "Musical",
+  "Western", "Film-Noir"];
 
 export default function Register() {
   const [email, setEmail] = useState("");

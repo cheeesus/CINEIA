@@ -7,10 +7,10 @@ import styles from '@/styles/profilePage.module.css';
 import Link from "next/link"; 
 
 const allGenres = [
-  "Western", "Drama", "Action", "Crime", "Mystery", "Thriller", "Horror",
-  "Adventure", "Science Fiction", "Romance", "Comedy", "War", "Fantasy",
-  "Animation", "Family", "History", "TV Movie", "Music", "Documentary"
-];
+  "Adventure", "Animation", "Children", "Comedy", "Fantasy",
+  "Romance", "Drama", "Action", "Crime", "Thriller", "Horror",
+  "Mystery", "Sci-Fi", "IMAX", "Documentary", "War", "Musical",
+  "Western", "Film-Noir"];
 
 // Load environment variables
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
