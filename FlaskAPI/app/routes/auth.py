@@ -63,24 +63,41 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
-    # Basic validation: Ensure email and password are provided
+    # Validate input: Ensure email and password are provided
     if not email or not password:
         return jsonify({"error": "Email and password are required"}), 400
 
     try:
         # Query for the user with the given email
         with g.db.cursor() as cursor:
-            cursor.execute("SELECT id, email, encode(password_hash, 'escape') as password_hash FROM users WHERE email = %s", (email,))
+            cursor.execute(
+                "SELECT id, email, encode(password_hash, 'escape') as password_hash FROM users WHERE email = %s",
+                (email,)
+            )
             user = cursor.fetchone()
-        
-        if user :
-            print(f"Stored Hash: {user[2]}") 
+
+        if user:
+            print(f"Stored Hash: {user[2]}")
             print(f"Entered Password: {password}")
-            if verify_password(password, user[2]) :
+            if verify_password(password, user[2]):
+                # Generate a token
                 token = generate_token({"user_id": user[0], "email": user[1]})
-                response = make_response(jsonify({"user_id": user[0], "email": user[1], "token": token}))
-                response.set_cookie("token", token, httponly=True, secure=True)
-                return response, 200  
+
+                # Prepare the response
+                response = make_response(
+                    jsonify({"user_id": user[0], "email": user[1], "token": token})
+                )
+
+                # Set the secure, HTTP-only cookie for the token
+                response.set_cookie(
+                    "token",
+                    token,
+                    secure=False,   # IMPORTANT: disable Secure on HTTP
+                    samesite="Lax", # or omit this for testing
+                    path="/"
+                )
+                return response, 200
+
         # If authentication fails
         return jsonify({"error": "Invalid credentials"}), 401
     except Exception as e:

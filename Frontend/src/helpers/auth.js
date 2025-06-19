@@ -2,7 +2,7 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 import {jwtDecode} from "jwt-decode"; // Install via npm: npm install jwt-decode
-
+// import jwtDecode from "jwt-decode";
 // Load environment variables
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -23,19 +23,23 @@ export const registerUser = async (email, password, age, selectedGenres) => {
 
 // Login user and save token in cookie
 export const loginUser = async (email, password) => {
+  console.log("LOGIN ->", `${API_URL}/auth/login`);
   try {
-    const response = await axios.post(`${API_URL}/auth/login`, { email, password });
-    console.log(response.data);
+    // Send login request with credentials included
+    const response = await axios.post(
+      `${API_URL}/auth/login`,
+      { email, password },
+      { withCredentials: true }
+    );
+
+    console.log("data:", response.data);
     const { user_id: userId, token, email: userEmail } = response.data;
 
     // Extract the first part of the email as username
     const username = userEmail.split("@")[0];
-
-    // Store token in cookies (secure: true for HTTPS, httpOnly should be set in backend)
-    Cookies.set("token", token, { expires: 0.5, secure: true , sameSite: "Strict" });
-
     return { userId, token, username };
   } catch (error) {
+    console.error("Login failed:", error.response?.data || error.message);
     throw new Error(error.response?.data?.error || "Login failed");
   }
 };

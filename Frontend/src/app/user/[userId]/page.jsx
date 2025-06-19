@@ -1,9 +1,10 @@
 'use client';  // This marks the component as a client component
-import { useEffect, useState, useContext, use } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import axios from "axios";
 import Header from "@/components/Header";
 import { UserContext } from "@/context/UserContext";
 import styles from '@/styles/profilePage.module.css';
+import Link from "next/link"; 
 
 const allGenres = [
   "Western", "Drama", "Action", "Crime", "Mystery", "Thriller", "Horror",
@@ -157,7 +158,7 @@ const UserProfile = ({params}) => {
               <tbody>
                 {checkedMovies.map((movie) => (
                   <tr key={movie.id}>
-                    <td>{movie.title}</td>
+                    <td><Link href={`/movies/${movie.id}`}>{movie.title}</Link></td>
                     <td>{formatDate(movie.date)}</td>
                   </tr>
                 ))}

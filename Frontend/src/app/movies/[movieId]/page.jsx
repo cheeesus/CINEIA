@@ -21,22 +21,10 @@ const MovieDetails = ({params}) => {
   const [showListModal, setShowListModal] = useState(false);
   const [existingLists, setExistingLists] = useState([]); // List of user's lists
 
-  // Unwrap params and set movieId
   useEffect(() => {
-    let isMounted = true; // To prevent setting state on unmounted component
-    const resolveParams = async () => {
-      try {
-        const resolvedParams = await params; // Assume params is a promise
-        if (isMounted) setMovieId(resolvedParams.movieId);
-      } catch (error) {
-        console.error("Error resolving params:", error);
-      }
-    };
-    resolveParams();
-
-    return () => {
-      isMounted = false;
-    };
+    if (params?.movieId) {
+      setMovieId(params.movieId);
+    }
   }, [params]);
 
   // Fetch movie details
@@ -241,6 +229,9 @@ const MovieDetails = ({params}) => {
       alert("Comment added!");
     }
   } catch (error) {
+    if(error.response.status === 400) {
+      alert("Please consider rating the movie before commenting.")
+    }
     console.error("Failed to submit comment:", error);
     alert("Failed to submit comment. Please try again.");
   }

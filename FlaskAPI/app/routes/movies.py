@@ -14,7 +14,7 @@ movies_bp = Blueprint('movies', __name__)
 
 @movies_bp.get("/<int:user_id>/recommend")
 def recommend(user_id: int):
-    top = int(request.args.get("top", 10))
+    top = int(request.args.get("top", 30))
 
     # Step 1: Get recommended movie IDs and scores
     mids, scores, strategy = recommend_movies_for_user(user_id, n_final=top)
@@ -58,12 +58,12 @@ def recommend(user_id: int):
             genre_map[movie_id].append(genre_name)
 
     # Step 3: Build response with details
-    return jsonify({
-        "user_id": user_id,
-        "strategy": strategy,  # cold | warm+rank
-        "items": [
-            {
-                "rank": i + 1,
+    seen_movies = set()  # Set to track added movies
+    unique_items = []
+    for i, mid in enumerate(mids_py):
+        if mid not in seen_movies:  # Skip if the movie is already added
+            unique_items.append({
+                "rank": len(unique_items) + 1,  # Adjust rank for unique items
                 "id": mid,
                 "title": movie_details.get(mid, {}).get("title", "Unknown"),
                 "release_date": movie_details.get(mid, {}).get("release_date"),
@@ -71,11 +71,14 @@ def recommend(user_id: int):
                 "rating": movie_details.get(mid, {}).get("rating"),
                 "genres": genre_map.get(mid, []),  # List of genres for the movie
                 "score": float(scores[i]) if scores[i] is not None else None
-            }
-            for i, mid in enumerate(mids_py)
-        ]
-    })
+            })
+            seen_movies.add(mid)  # Mark this movie as seen
 
+    return jsonify({
+        "user_id": user_id,
+        "strategy": strategy,  # cold | warm+rank
+        "items": unique_items
+    })
 
 @movies_bp.route('/recent', methods=['GET'])
 def get_movies_recent():

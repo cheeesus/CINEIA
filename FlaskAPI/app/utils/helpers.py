@@ -24,6 +24,7 @@ def token_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         token = request.headers.get('Authorization', None)
+        
         if not token:
             return jsonify({'message': 'Token is missing!'}), 403
         

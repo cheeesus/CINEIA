@@ -1,6 +1,7 @@
 'use client';  // This marks the component as a client component
 import { useEffect, useState, useContext } from 'react';
 import axios from "axios";
+import Link from "next/link"; 
 import Header from "@/components/Header";
 import styles from "@/styles/listsDetails.module.css";
 import { UserContext } from "@/context/UserContext";
@@ -162,8 +163,10 @@ const ListsDetails = () => {
                     <td>
                       {list.movies && list.movies.length > 0 ? (
                         list.movies.map((movie) => (
-                          <div key={movie.id}>
-                            {movie.title}
+                          <div key={movie.id} className={styles.listMovie}>
+                            <Link href={`/movies/${movie.id}`}>
+                              {movie.title}
+                            </Link>
                             <FaTimes
                               className={styles.deleteIcon}
                               onClick={() => deleteMovie(list.list_id, movie.id)}
