@@ -77,6 +77,7 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
     # 加入用户偏好题材（pref_genre_id）
     pref_rows = fetchall_dict("SELECT user_id, genre_id AS pref_genre_id FROM user_preferences")
     pref_df = pd.DataFrame(pref_rows)
+    print(pref_df)
     df = df.merge(pref_df, on="user_id", how="left")
     df["pref_genre_id"].fillna(0, inplace=True)
     df["pref_genre_id"] = df["pref_genre_id"].astype(int)
@@ -89,9 +90,16 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
         WHERE l.name = 'favorites'
     """)
     fav_df = pd.DataFrame(fav_rows)
-    fav_df["is_favorite"] = 1
+    print("fav_rows:", fav_rows)
+    
+    # Add `is_favorite` column, even if fav_df is empty
+    if not fav_df.empty:
+        fav_df["is_favorite"] = 1
+        df = df.merge(fav_df[["user_id", "movie_id", "is_favorite"]], on=["user_id", "movie_id"], how="left")
+    else:
+        print("fav_df is empty; adding default `is_favorite` column.")
+        df["is_favorite"] = 0
 
-    df = df.merge(fav_df, on=["user_id", "movie_id"], how="left")
     df["is_favorite"].fillna(0, inplace=True)
     df["is_favorite"] = df["is_favorite"].astype(int)
 
@@ -99,8 +107,12 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
     watch_count = pos_df.groupby("user_id")["movie_id"].count().reset_index()
     watch_count.columns = ["user_id", "user_watch_count"]
 
-    fav_count = fav_df.groupby("user_id")["movie_id"].count().reset_index()
-    fav_count.columns = ["user_id", "user_fav_count"]
+    # Handle fav_df being empty when computing `user_fav_count`
+    if not fav_df.empty:
+        fav_count = fav_df.groupby("user_id")["movie_id"].count().reset_index()
+        fav_count.columns = ["user_id", "user_fav_count"]
+    else:
+        fav_count = pd.DataFrame(columns=["user_id", "user_fav_count"])
 
     df = df.merge(watch_count, on="user_id", how="left")
     df = df.merge(fav_count, on="user_id", how="left")
@@ -110,7 +122,9 @@ def build_training_df(neg_ratio: int = 1) -> pd.DataFrame:
 
     # 最后统一填充所有空值
     df.fillna(0, inplace=True)
+
     return df
+
 
 
 def build_infer_df(user_id: int, candidate_movies: list[int], recall_scores: list[float]) -> pd.DataFrame:

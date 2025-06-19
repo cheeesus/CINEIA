@@ -168,7 +168,7 @@ const ListsDetails = () => {
                               {movie.title}
                             </Link>
                             <FaTimes
-                              className={styles.deleteIcon}
+                              className={styles.movieDeleteIcon}
                               onClick={() => deleteMovie(list.list_id, movie.id)}
                             />
                           </div>

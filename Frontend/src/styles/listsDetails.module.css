@@ -51,6 +51,23 @@
   justify-items: space-between;
   margin-top: 10px;
 }
+.listMovie {
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  padding: 10px; 
+  border-bottom: 1px solid #ccc; 
+}
+
+.listMovie a {
+  text-decoration: none; 
+  flex-grow: 1; 
+}
+
+.movieDeleteIcon {
+  color: brown; /* Set delete icon color */
+  cursor: pointer; /* Change cursor to pointer for better UX */
+}
 .deleteIcon {
     cursor: pointer;
 }
