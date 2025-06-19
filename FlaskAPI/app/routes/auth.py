@@ -39,7 +39,7 @@ def register():
             cursor.execute(
                 f"SELECT id FROM genres WHERE name IN ({format_strings})",
                 tuple(selected_genres)
-            )
+            ) 
             genre_ids = [row[0] for row in cursor.fetchall()]
 
             # Insert user preferences

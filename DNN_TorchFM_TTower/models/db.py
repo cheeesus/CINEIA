@@ -13,7 +13,7 @@ def get_connection():
         host=DB_HOST,
         port=DB_PORT
     )
-
+ 
 def fetchall_dict(query, params=None):
     with get_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:

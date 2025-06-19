@@ -8,6 +8,8 @@ now including the user's preferred genre as an extra sparse field.
 from collections import defaultdict
 from typing import List
 import pandas as pd
+import torch 
+from DNN_TorchFM_TTower.models.ranking.torchfm.deepfm import DeepFM 
 
 from DNN_TorchFM_TTower.models.db import fetchall_dict, fetchone_dict
 
@@ -174,3 +176,55 @@ def fetch_user_favorite_movies() -> dict[int, set[int]]:
     for r in rows:
         fav_map.setdefault(r["user_id"], set()).add(r["movie_id"])
     return fav_map
+
+def get_user_genres(user_id: int) -> list[int]:
+    """
+    Fetch the genres selected by the user.
+
+    Args:
+        user_id: The ID of the user.
+
+    Returns:
+        A list of genre IDs selected by the user.
+    """
+    query = "SELECT genre_id FROM user_preferences WHERE user_id = %s"
+    rows = fetchall_dict(query, (user_id,))
+    return [row["genre_id"] for row in rows] if rows else []
+
+def get_movies_list() -> list[dict]:
+    """
+    Fetch the list of movies from the database.
+
+    Returns:
+        A list of movie dictionaries, each containing:
+        - id: Movie ID
+        - vote_average: Average vote score
+        - vote_count: Number of votes
+    """
+    query = """
+        SELECT id, vote_average, vote_count
+        FROM movies
+    """
+    rows = fetchall_dict(query)
+    return rows if rows else []
+
+def load_deepfm_model(model_path: str = "DNN_TorchFM_TTower/saved_model/deepfm_ranker.pt") -> torch.nn.Module:
+    """
+    Load the trained DeepFM model from disk.
+
+    Args:
+        model_path: Path to the saved model file.
+
+    Returns:
+        An instance of the trained DeepFM model.
+    """
+    # Define the model architecture (ensure it matches the saved model)
+    model = DeepFM()  # Replace with the correct initialization for your model
+
+    # Load the model state dictionary
+    model.load_state_dict(torch.load(model_path))
+
+    # Set the model to evaluation mode
+    model.eval()
+
+    return model

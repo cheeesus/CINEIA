@@ -50,7 +50,7 @@ def recommend_movies_for_user(user_id: int,
 
     # -------- 冷启动 --------
     if view_cnt == 0:
-        mids = cold_start.recommend_cold_start(top_n=n_final)
+        mids = cold_start.recommend_cold_start(user_id, top_n=n_final)
         return mids, [None] * len(mids), "cold"
 
     # -------- 热启动 (Two-Tower) + fallback --------
@@ -62,11 +62,11 @@ def recommend_movies_for_user(user_id: int,
     except IndexError:
         # Embedding 越界，新用户/新电影尚未在模型中：fallback 到冷启动
         print(f"[recommender] user {user_id} embedding 越界，fallback cold-start")
-        mids = cold_start.recommend_cold_start(top_n=n_final)
+        mids = cold_start.recommend_cold_start(user_id,top_n=n_final)
         return mids, [None] * len(mids), "cold"
 
     if not recall_ids:
-        mids = cold_start.recommend_cold_start(top_n=n_final)
+        mids = cold_start.recommend_cold_start(user_id,top_n=n_final)
         return mids, [None] * len(mids), "cold"
 
     # -------- DeepFM 精排 --------
